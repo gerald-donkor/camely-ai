@@ -1,3 +1,5 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import { dark } from "@clerk/ui/themes";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -23,11 +25,45 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+    <ClerkProvider
+      afterSignOutUrl={
+        process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? "/sign-in"
+      }
+      signInFallbackRedirectUrl="/editor"
+      signUpFallbackRedirectUrl="/editor"
+      appearance={{
+        theme: dark,
+        variables: {
+          colorPrimary: "var(--accent-primary)",
+          colorPrimaryForeground: "var(--bg-base)",
+          colorDanger: "var(--state-error)",
+          colorSuccess: "var(--state-success)",
+          colorWarning: "var(--state-warning)",
+          colorForeground: "var(--text-primary)",
+          colorMuted: "var(--bg-subtle)",
+          colorMutedForeground: "var(--text-muted)",
+          colorBackground: "var(--bg-elevated)",
+          colorInputForeground: "var(--text-primary)",
+          colorInput: "var(--bg-subtle)",
+          colorRing: "var(--accent-primary)",
+          colorBorder: "var(--border-default)",
+          fontFamily: "var(--font-geist-sans)",
+          fontFamilyMono: "var(--font-geist-mono)",
+          borderRadius: "var(--radius)",
+        },
+      }}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
-    </html>
+      <html
+        lang="en"
+        className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      >
+        <body
+          suppressHydrationWarning
+          className="min-h-full flex flex-col"
+        >
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

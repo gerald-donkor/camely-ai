@@ -4,11 +4,11 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Editor foundation
+- Authentication foundation
 
 ## Current Goal
 
-- Editor chrome foundation is complete; ready for the next editor feature unit.
+- Authentication foundation is complete; ready for the next feature unit.
 
 ## Completed
 
@@ -23,13 +23,22 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added a floating overlay project sidebar with slide-in behavior, close control, My Projects and Shared tabs, empty states, and a full-width New Project action.
   - Confirmed the existing protected dialog primitives compose token-based title, description, and footer actions without modification.
   - Verified with ESLint, TypeScript, and a production build.
+- Authentication (`context/feature-specs/03-auth.md`):
+  - Added `@clerk/ui` and wrapped the root layout with Clerk's dark theme customized through existing application CSS variables.
+  - Added minimal responsive sign-in and sign-up pages using Clerk's prebuilt components.
+  - Added root-level `proxy.ts` with public auth paths sourced from Clerk's route environment variables and protection for every other route.
+  - Added session-aware redirects from `/` to `/editor` or `/sign-in`.
+  - Added Clerk's default `UserButton` to the editor navbar.
+  - Added the protected `/editor` destination with the reusable navbar and floating project sidebar composed around the canvas surface.
+  - Verified with ESLint, TypeScript, and a production build.
+
 ## In Progress
 
 - None.
 
 ## Next Up
 
-- Select the next editor feature unit that extends the shared chrome.
+- Select the next feature unit after authentication.
 
 ## Open Questions
 
@@ -45,3 +54,10 @@ Update this file whenever the current phase, active feature, or implementation s
 - Design system implementation completed on 2026-06-29. `npm run lint` and `npm run build` pass.
 - Editor chrome implementation started on 2026-06-29.
 - Editor chrome implementation completed on 2026-06-29. `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
+- Authentication implementation started on 2026-06-29.
+- Authentication implementation completed on 2026-06-29. `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
+- Auth pages refined on 2026-06-29 to match the approved two-panel visual reference with Camely AI wording.
+- Clerk's sign-in and sign-up cross-links were explicitly connected to the dedicated public auth routes on 2026-06-29.
+- The protected editor route was added on 2026-06-29 with the project sidebar open by default.
+- The logout RSC navigation failure was resolved on 2026-06-29 by configuring direct Clerk provider redirects between public auth routes and `/editor`.
+- Grammarly-injected root body attributes were isolated on 2026-06-29 with body-scoped hydration warning suppression.
