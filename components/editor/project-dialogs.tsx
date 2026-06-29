@@ -1,0 +1,124 @@
+"use client"
+
+import type { FormEvent } from "react"
+
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import type { ProjectDialogsController } from "@/hooks/use-project-dialogs"
+
+interface ProjectDialogsProps {
+  controller: ProjectDialogsController
+}
+
+export function ProjectDialogs({ controller }: ProjectDialogsProps) {
+  const {
+    closeDialog,
+    dialog,
+    isLoading,
+    projectName,
+    setProjectName,
+    slugPreview,
+    submitDialog,
+  } = controller
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    submitDialog()
+  }
+
+  const isDelete = dialog?.type === "delete"
+  const isRename = dialog?.type === "rename"
+  const isCreate = dialog?.type === "create"
+
+  return (
+    <Dialog
+      open={dialog !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          closeDialog()
+        }
+      }}
+    >
+      <DialogContent className="gap-4 rounded-3xl border border-surface-border bg-elevated p-4 text-copy-primary ring-0 sm:max-w-sm">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle className="text-lg">
+              {isCreate && "New Project"}
+              {isRename && "Rename Project"}
+              {isDelete && "Delete Project"}
+            </DialogTitle>
+            <DialogDescription className="text-copy-muted">
+              {isCreate && "Give your project a name to get started."}
+              {isRename &&
+                `Rename “${dialog.project.name}”. The project slug will update with the new name.`}
+              {isDelete &&
+                `Permanently delete “${dialog.project.name}”? This action cannot be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!isDelete && (
+            <div className="mt-4">
+              {isRename && (
+                <label
+                  htmlFor="project-name"
+                  className="mb-2 block text-sm font-medium text-copy-primary"
+                >
+                  Project name
+                </label>
+              )}
+              <Input
+                id="project-name"
+                name="projectName"
+                value={projectName}
+                placeholder="Project name"
+                className="text-copy-primary placeholder:text-copy-muted"
+                autoFocus={isRename}
+                disabled={isLoading}
+                onChange={(event) => setProjectName(event.target.value)}
+              />
+              {isCreate && slugPreview && (
+                <p className="mt-2 font-mono text-xs text-copy-muted">
+                  {slugPreview}
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="-mx-4 -mb-4 mt-5 flex-row justify-end rounded-b-3xl border-surface-border bg-subtle/50 px-4 py-4">
+            <Button
+              type="submit"
+              variant={isDelete ? "destructive" : "default"}
+              disabled={
+                isLoading || (!isDelete && projectName.trim().length === 0)
+              }
+            >
+              {isLoading
+                ? "Working..."
+                : isCreate
+                  ? "Create Project"
+                  : isRename
+                    ? "Save Changes"
+                    : "Delete Project"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isLoading}
+              onClick={closeDialog}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

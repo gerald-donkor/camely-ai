@@ -4,11 +4,11 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Authentication foundation
+- Project workspace foundation
 
 ## Current Goal
 
-- Authentication foundation is complete; ready for the next feature unit.
+- Project dialog and sidebar action foundation is complete; ready for the next feature unit.
 
 ## Completed
 
@@ -31,6 +31,15 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added Clerk's default `UserButton` to the editor navbar.
   - Added the protected `/editor` destination with the reusable navbar and floating project sidebar composed around the canvas surface.
   - Verified with ESLint, TypeScript, and a production build.
+- Project dialogs (`context/feature-specs/04-project-dialogs.md`):
+  - Added the minimal editor home with a centered create-project action.
+  - Added mock owned and shared projects, with rename and delete actions restricted to owned projects.
+  - Added create, rename, and destructive delete dialogs with keyboard submission and rename auto-focus.
+  - Added live project slug generation to the create dialog.
+  - Added a dedicated hook for dialog, form, loading, and mock project state.
+  - Wired both create actions and the sidebar rename/delete actions to local mock updates.
+  - Added a mobile backdrop that closes the floating sidebar when tapped.
+  - Verified with ESLint, TypeScript, and a production build.
 
 ## In Progress
 
@@ -38,7 +47,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Select the next feature unit after authentication.
+- Select the next feature unit after project dialogs.
 
 ## Open Questions
 
@@ -61,3 +70,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - The protected editor route was added on 2026-06-29 with the project sidebar open by default.
 - The logout RSC navigation failure was resolved on 2026-06-29 by configuring direct Clerk provider redirects between public auth routes and `/editor`.
 - Grammarly-injected root body attributes were isolated on 2026-06-29 with body-scoped hydration warning suppression.
+- Project dialogs implementation started on 2026-06-29.
+- Project dialogs implementation completed on 2026-06-29. `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
+- The create dialog was refined on 2026-06-29 to match the approved compact reference; slug generation remains internal to the mock project state.
+- The create dialog now reveals a live normalized slug beneath the input once a project name is entered, with explicit primary and placeholder text colors.
