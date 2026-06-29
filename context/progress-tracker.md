@@ -4,11 +4,11 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Foundation
+- Editor foundation
 
 ## Current Goal
 
-- Design system foundation is complete; awaiting the next feature unit.
+- Editor chrome foundation is complete; ready for the next editor feature unit.
 
 ## Completed
 
@@ -18,14 +18,18 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added Lucide React and the shared `cn()` class-merging helper.
   - Mapped the Camely dark-theme tokens into Tailwind and shadcn semantic tokens.
   - Verified with ESLint, a production build, component import checks, and a direct `cn()` merge check.
-
+- Editor chrome (`context/feature-specs/02-editor.md`):
+  - Added a fixed-height, three-section editor navbar with an accessible, state-aware project-sidebar toggle.
+  - Added a floating overlay project sidebar with slide-in behavior, close control, My Projects and Shared tabs, empty states, and a full-width New Project action.
+  - Confirmed the existing protected dialog primitives compose token-based title, description, and footer actions without modification.
+  - Verified with ESLint, TypeScript, and a production build.
 ## In Progress
 
 - None.
 
 ## Next Up
 
-- Select and begin the next feature unit after the design system passes its completion checks.
+- Select the next editor feature unit that extends the shared chrome.
 
 ## Open Questions
 
@@ -39,3 +43,5 @@ Update this file whenever the current phase, active feature, or implementation s
 ## Session Notes
 
 - Design system implementation completed on 2026-06-29. `npm run lint` and `npm run build` pass.
+- Editor chrome implementation started on 2026-06-29.
+- Editor chrome implementation completed on 2026-06-29. `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
