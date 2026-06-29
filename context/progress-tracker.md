@@ -4,32 +4,38 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Not started
+- Foundation
 
 ## Current Goal
 
-- Define the immediate implementation goal here.
+- Design system foundation is complete; awaiting the next feature unit.
 
 ## Completed
 
-- None yet.
+- Design system foundation (`context/feature-specs/01-design-system.md`):
+  - Configured shadcn/ui for Next.js and Tailwind CSS v4.
+  - Added Button, Card, Dialog, Input, Tabs, Textarea, and ScrollArea primitives.
+  - Added Lucide React and the shared `cn()` class-merging helper.
+  - Mapped the Camely dark-theme tokens into Tailwind and shadcn semantic tokens.
+  - Verified with ESLint, a production build, component import checks, and a direct `cn()` merge check.
 
 ## In Progress
 
-- None yet.
+- None.
 
 ## Next Up
 
-- Add the next planned feature unit here.
+- Select and begin the next feature unit after the design system passes its completion checks.
 
 ## Open Questions
 
-- Add unresolved product or implementation questions here.
+- None.
 
 ## Architecture Decisions
 
-- Add decisions that affect the system design or data model.
+- shadcn/ui uses its generated Base Nova components with Base UI primitives; generated files in `components/ui/` remain unmodified.
+- The application root is permanently dark, and shadcn semantic color variables alias the Camely design tokens.
 
 ## Session Notes
 
-- Add context needed to resume work in the next session.
+- Design system implementation completed on 2026-06-29. `npm run lint` and `npm run build` pass.
