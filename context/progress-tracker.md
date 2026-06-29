@@ -4,11 +4,11 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Project workspace foundation
+- Data foundation
 
 ## Current Goal
 
-- Project dialog and sidebar action foundation is complete; ready for the next feature unit.
+- Prisma project data foundation is complete; ready for the next feature unit.
 
 ## Completed
 
@@ -40,6 +40,13 @@ Update this file whenever the current phase, active feature, or implementation s
   - Wired both create actions and the sidebar rename/delete actions to local mock updates.
   - Added a mobile backdrop that closes the floating sidebar when tapped.
   - Verified with ESLint, TypeScript, and a production build.
+- Prisma project foundation (`context/feature-specs/05-prisma.md`):
+  - Added `Project` and `ProjectCollaborator` to the multi-file Prisma schema with the required status enum, relation, cascade delete, unique constraint, and indexes.
+  - Added an environment-aware cached Prisma singleton that uses Accelerate for `prisma+postgres://` and `@prisma/adapter-pg` for direct PostgreSQL URLs.
+  - Configured Prisma CLI environment loading from `.env.local` with `.env` fallback.
+  - Created and applied the initial `init_projects` migration.
+  - Generated and validated the Prisma 7.8 client.
+  - Verified migration status, ESLint, TypeScript, and a production build.
 
 ## In Progress
 
@@ -47,7 +54,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Select the next feature unit after project dialogs.
+- Select the next feature unit after the Prisma project foundation.
 
 ## Open Questions
 
@@ -57,6 +64,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 - shadcn/ui uses its generated Base Nova components with Base UI primitives; generated files in `components/ui/` remain unmodified.
 - The application root is permanently dark, and shadcn semantic color variables alias the Camely design tokens.
+- Prisma runtime connections branch by URL protocol: Prisma Postgres/Accelerate URLs use the official Accelerate extension, while direct PostgreSQL URLs use the `pg` driver adapter.
 
 ## Session Notes
 
@@ -74,3 +82,5 @@ Update this file whenever the current phase, active feature, or implementation s
 - Project dialogs implementation completed on 2026-06-29. `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
 - The create dialog was refined on 2026-06-29 to match the approved compact reference; slug generation remains internal to the mock project state.
 - The create dialog now reveals a live normalized slug beneath the input once a project name is entered, with explicit primary and placeholder text colors.
+- Prisma project foundation implementation started on 2026-06-29.
+- Prisma project foundation implementation completed on 2026-06-29. The initial migration is applied, migration status is current, and `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
