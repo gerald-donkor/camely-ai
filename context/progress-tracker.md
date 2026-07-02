@@ -4,12 +4,11 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Data foundation
+- Editor workspace foundation
 
 ## Current Goal
 
-- Editor home project data and actions are wired; ready for the next feature unit.
-- Prisma project data foundation is complete; ready for the next feature unit.
+- Project sharing is complete; ready for canvas infrastructure.
 
 ## Completed
 
@@ -63,6 +62,22 @@ Update this file whenever the current phase, active feature, or implementation s
   - Created and applied the initial `init_projects` migration.
   - Generated and validated the Prisma 7.8 client.
   - Verified migration status, ESLint, TypeScript, and a production build.
+- Editor workspace shell (`context/feature-specs/08-editor-workspace-shell.md`):
+  - Renamed the dynamic workspace route to `/editor/[roomId]` and retained it as a Server Component.
+  - Added shared Clerk identity and owner-or-collaborator project access helpers.
+  - Added a common `AccessDenied` state for missing and unauthorized projects.
+  - Added a dedicated full-viewport project workspace with the project name, disabled share placeholder, AI sidebar toggle, canvas placeholder, and AI chat placeholder.
+  - Reused the project sidebar with current-room highlighting and automatic owned/shared tab selection.
+  - Kept Liveblocks, real canvas behavior, AI chat, and sharing behavior out of scope.
+  - Verified with Next.js route type generation, TypeScript, ESLint, and a production build.
+- Share dialog (`context/feature-specs/09-share-dialog.md`):
+  - Added authenticated collaborator list, invite, and remove API operations.
+  - Enforced owner-only invite and removal server-side while allowing collaborators to list access.
+  - Added Clerk Backend API enrichment for collaborator display names and avatars with email-only fallback.
+  - Added a workspace share dialog with owner management controls and collaborator read-only rendering.
+  - Added owner-only project-link copying with temporary `Copied!` feedback.
+  - Kept collaborator identity email-based in PostgreSQL without adding a local user table.
+  - Verified with Next.js route type generation, TypeScript, ESLint, and a production build.
 
 ## In Progress
 
@@ -70,8 +85,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Select the next feature unit.
-- Select the next feature unit after the Prisma project foundation.
+- Add canvas infrastructure in its dedicated feature unit.
 
 ## Open Questions
 
@@ -82,6 +96,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - shadcn/ui uses its generated Base Nova components with Base UI primitives; generated files in `components/ui/` remain unmodified.
 - The application root is permanently dark, and shadcn semantic color variables alias the Camely design tokens.
 - Prisma runtime connections branch by URL protocol: Prisma Postgres/Accelerate URLs use the official Accelerate extension, while direct PostgreSQL URLs use the `pg` driver adapter.
+- Missing and unauthorized workspace rooms share one access-denied response so project existence is not disclosed.
+- Collaborator access remains keyed by normalized email; Clerk is queried read-only for optional profile enrichment.
 
 ## Session Notes
 
@@ -106,3 +122,10 @@ Update this file whenever the current phase, active feature, or implementation s
 - Editor home API wiring completed on 2026-07-01. `npx next typegen`, `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
 - Prisma project foundation implementation started on 2026-06-29.
 - Prisma project foundation implementation completed on 2026-06-29. The initial migration is applied, migration status is current, and `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
+- Editor workspace shell implementation started on 2026-07-02.
+- Editor workspace shell implementation completed on 2026-07-02. `npx next typegen`, `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
+- Removed the leftover empty `/editor/[projectId]` source directory on 2026-07-02 after its stale development route conflicted with `/editor/[roomId]`.
+- Refined the project-detail workspace on 2026-07-02 to use the approved docked three-panel shell, project-context navbar, bordered canvas placeholder, and expanded AI placeholder.
+- Share dialog implementation started on 2026-07-02.
+- Share dialog implementation completed on 2026-07-02. `npx next typegen`, `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
+- Share access lists were refined on 2026-07-02 to always include the current project owner as a non-removable, Clerk-enriched owner row.

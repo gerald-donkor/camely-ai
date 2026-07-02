@@ -14,7 +14,9 @@ import { cn } from "@/lib/utils"
 import type { Project } from "@/types/project"
 
 interface ProjectSidebarProps {
+  activeProjectId?: string
   isOpen: boolean
+  layout?: "overlay" | "docked"
   onClose: () => void
   onCreate: () => void
   onDelete: (project: Project) => void
@@ -24,6 +26,7 @@ interface ProjectSidebarProps {
 }
 
 interface ProjectListProps {
+  activeProjectId?: string
   emptyDescription: string
   onDelete?: (project: Project) => void
   onRename?: (project: Project) => void
@@ -31,6 +34,7 @@ interface ProjectListProps {
 }
 
 function ProjectList({
+  activeProjectId,
   emptyDescription,
   onDelete,
   onRename,
@@ -49,11 +53,18 @@ function ProjectList({
       {projects.map((project) => (
         <li
           key={project.id}
-          className="flex items-center gap-2 rounded-xl px-2 py-2 hover:bg-subtle"
+          className={cn(
+            "flex items-center gap-2 rounded-xl px-2 py-2 hover:bg-subtle",
+            project.id === activeProjectId && "bg-accent-dim",
+          )}
         >
           <Link
             href={`/editor/${project.id}`}
-            className="min-w-0 flex-1 truncate text-sm text-copy-secondary hover:text-copy-primary"
+            aria-current={project.id === activeProjectId ? "page" : undefined}
+            className={cn(
+              "min-w-0 flex-1 truncate text-sm text-copy-secondary hover:text-copy-primary",
+              project.id === activeProjectId && "text-brand",
+            )}
           >
             {project.name}
           </Link>
@@ -87,7 +98,9 @@ function ProjectList({
 }
 
 export function ProjectSidebar({
+  activeProjectId,
   isOpen,
+  layout = "overlay",
   onClose,
   onCreate,
   onDelete,
@@ -95,13 +108,17 @@ export function ProjectSidebar({
   ownedProjects,
   sharedProjects,
 }: ProjectSidebarProps) {
+  const activeProjectIsShared = sharedProjects.some(
+    (project) => project.id === activeProjectId,
+  )
+
   return (
     <>
       {isOpen && (
         <button
           type="button"
           aria-label="Close project sidebar"
-          className="fixed inset-x-0 bottom-0 top-14 z-30 bg-base/70 lg:hidden"
+          className="fixed inset-x-0 bottom-0 top-16 z-30 bg-base/70 lg:hidden"
           onClick={onClose}
         />
       )}
@@ -112,7 +129,9 @@ export function ProjectSidebar({
         aria-hidden={!isOpen}
         inert={!isOpen}
         className={cn(
-          "fixed bottom-3 left-3 top-17 z-40 flex w-[min(20rem,calc(100vw-1.5rem))] flex-col rounded-2xl border border-surface-border bg-surface/95 shadow-2xl backdrop-blur-sm transition-transform duration-200 ease-out",
+          "fixed bottom-3 left-3 top-19 z-40 flex w-[min(20rem,calc(100vw-1.5rem))] flex-col rounded-2xl border border-surface-border bg-surface/95 shadow-2xl backdrop-blur-sm transition-transform duration-200 ease-out",
+          layout === "docked" &&
+            "lg:static lg:h-full lg:w-full lg:shadow-none",
           isOpen
             ? "translate-x-0"
             : "-translate-x-[calc(100%+0.75rem)] pointer-events-none"
@@ -133,7 +152,10 @@ export function ProjectSidebar({
           </Button>
         </div>
 
-        <Tabs defaultValue="my-projects" className="min-h-0 flex-1 p-4">
+        <Tabs
+          defaultValue={activeProjectIsShared ? "shared" : "my-projects"}
+          className="min-h-0 flex-1 p-4"
+        >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="my-projects">My Projects</TabsTrigger>
             <TabsTrigger value="shared">Shared</TabsTrigger>
@@ -143,6 +165,7 @@ export function ProjectSidebar({
             className="mt-2 min-h-0 overflow-y-auto"
           >
             <ProjectList
+              activeProjectId={activeProjectId}
               projects={ownedProjects}
               emptyDescription="Your projects will appear here."
               onRename={onRename}
@@ -154,6 +177,7 @@ export function ProjectSidebar({
             className="mt-2 min-h-0 overflow-y-auto"
           >
             <ProjectList
+              activeProjectId={activeProjectId}
               projects={sharedProjects}
               emptyDescription="Projects shared with you will appear here."
             />
