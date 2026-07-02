@@ -1,8 +1,10 @@
+// Lifecycle state for project metadata.
 enum ProjectStatus {
   DRAFT
   ARCHIVED
 }
 
+// Core project record owned by a Clerk user.
 model Project {
   id             String                @id @default(cuid())
   ownerId        String
@@ -18,6 +20,7 @@ model Project {
   @@index([createdAt])
 }
 
+// Email-based collaborators associated with a project.
 model ProjectCollaborator {
   id        String   @id @default(cuid())
   projectId String

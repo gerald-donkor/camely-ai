@@ -7,11 +7,22 @@ import { EditorNavbar } from "@/components/editor/editor-navbar"
 import { ProjectDialogs } from "@/components/editor/project-dialogs"
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
 import { Button } from "@/components/ui/button"
-import { useProjectDialogs } from "@/hooks/use-project-dialogs"
+import { useProjectActions } from "@/hooks/use-project-actions"
+import type { Project } from "@/types/project"
 
-export function EditorWorkspace() {
+interface EditorWorkspaceProps {
+  activeProjectId?: string
+  ownedProjects: Project[]
+  sharedProjects: Project[]
+}
+
+export function EditorWorkspace({
+  activeProjectId,
+  ownedProjects,
+  sharedProjects,
+}: EditorWorkspaceProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-  const projectDialogs = useProjectDialogs()
+  const projectActions = useProjectActions({ activeProjectId })
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-base">
@@ -22,10 +33,11 @@ export function EditorWorkspace() {
       <ProjectSidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        onCreate={projectDialogs.openCreate}
-        onDelete={projectDialogs.openDelete}
-        onRename={projectDialogs.openRename}
-        projects={projectDialogs.projects}
+        onCreate={projectActions.openCreate}
+        onDelete={projectActions.openDelete}
+        onRename={projectActions.openRename}
+        ownedProjects={ownedProjects}
+        sharedProjects={sharedProjects}
       />
       <main
         aria-label="System design canvas"
@@ -47,7 +59,7 @@ export function EditorWorkspace() {
             <Button
               type="button"
               className="mt-6"
-              onClick={projectDialogs.openCreate}
+              onClick={projectActions.openCreate}
             >
               <Plus aria-hidden="true" />
               New Project
@@ -55,7 +67,7 @@ export function EditorWorkspace() {
           </div>
         </div>
       </main>
-      <ProjectDialogs controller={projectDialogs} />
+      <ProjectDialogs controller={projectActions} />
     </div>
   )
 }

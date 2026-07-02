@@ -1,6 +1,7 @@
 "use client"
 
 import { Pencil, Plus, Trash2, X } from "lucide-react"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -18,7 +19,8 @@ interface ProjectSidebarProps {
   onCreate: () => void
   onDelete: (project: Project) => void
   onRename: (project: Project) => void
-  projects: Project[]
+  ownedProjects: Project[]
+  sharedProjects: Project[]
 }
 
 interface ProjectListProps {
@@ -49,9 +51,12 @@ function ProjectList({
           key={project.id}
           className="flex items-center gap-2 rounded-xl px-2 py-2 hover:bg-subtle"
         >
-          <span className="min-w-0 flex-1 truncate text-sm text-copy-secondary">
+          <Link
+            href={`/editor/${project.id}`}
+            className="min-w-0 flex-1 truncate text-sm text-copy-secondary hover:text-copy-primary"
+          >
             {project.name}
-          </span>
+          </Link>
           {project.access === "owned" && onRename && onDelete && (
             <div className="flex items-center">
               <Button
@@ -87,15 +92,9 @@ export function ProjectSidebar({
   onCreate,
   onDelete,
   onRename,
-  projects,
+  ownedProjects,
+  sharedProjects,
 }: ProjectSidebarProps) {
-  const ownedProjects = projects.filter(
-    (project) => project.access === "owned"
-  )
-  const sharedProjects = projects.filter(
-    (project) => project.access === "shared"
-  )
-
   return (
     <>
       {isOpen && (
