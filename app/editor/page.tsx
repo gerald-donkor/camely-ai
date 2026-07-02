@@ -1,19 +1,20 @@
-import { auth, currentUser } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 
 import { EditorWorkspace } from "@/components/editor/editor-workspace"
+import { getCurrentClerkIdentity } from "@/lib/project-access"
 import { getProjectLists } from "@/lib/projects"
 
 export default async function EditorPage() {
-  const { userId } = await auth()
+  const identity = await getCurrentClerkIdentity()
 
-  if (!userId) {
+  if (!identity) {
     redirect("/sign-in")
   }
 
-  const user = await currentUser()
-  const email = user?.primaryEmailAddress?.emailAddress ?? null
-  const { ownedProjects, sharedProjects } = await getProjectLists(userId, email)
+  const { ownedProjects, sharedProjects } = await getProjectLists(
+    identity.userId,
+    identity.primaryEmail,
+  )
 
   return (
     <EditorWorkspace
