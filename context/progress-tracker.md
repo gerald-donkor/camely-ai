@@ -4,11 +4,12 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Editor workspace foundation
+- Collaborative canvas foundation
 
 ## Current Goal
 
-- Project sharing is complete; ready for canvas infrastructure.
+- Canvas visual and drag-and-drop issue remediation is complete; ready for
+  further canvas interactions.
 
 ## Completed
 
@@ -78,6 +79,38 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added owner-only project-link copying with temporary `Copied!` feedback.
   - Kept collaborator identity email-based in PostgreSQL without adding a local user table.
   - Verified with Next.js route type generation, TypeScript, ESLint, and a production build.
+- Liveblocks setup (`context/feature-specs/10-liveblocks-setup.md`):
+  - Added globally typed cursor and thinking presence plus user name, avatar, and cursor color metadata.
+  - Added a lazily initialized, development-cached Liveblocks server client.
+  - Added deterministic cursor color assignment from a fixed canvas-aligned palette.
+  - Added a Clerk-authenticated room token route with existing owner-or-collaborator project access enforcement.
+  - Added idempotent private room creation and room-scoped write sessions carrying Clerk user metadata.
+  - Recorded the Liveblocks client, React, React Flow, and Node packages as reproducible dependencies.
+  - Verified with Next.js route type generation, TypeScript, ESLint, and a production build.
+- Base collaborative canvas (`context/feature-specs/11-base-canvas.md`):
+  - Kept the workspace route server-rendered and added a focused client boundary for Liveblocks and React Flow.
+  - Added room-scoped Liveblocks providers with initial presence, suspense loading, and a connection error fallback.
+  - Added shared canvas node data, shape, node, and edge types.
+  - Wired empty Liveblocks-synced nodes and edges into React Flow with loose connections, fit-to-view, a minimap, and a dot background.
+  - Kept controls, custom rendering, persistence, cursors, and AI behavior out of scope.
+  - Verified with TypeScript, ESLint, and a production build.
+- Shape panel (`context/feature-specs/12-shape-panel.md`):
+  - Added a floating bottom-center toolbar with draggable rectangle, diamond, circle, pill, cylinder, and hexagon controls.
+  - Added typed drag payloads containing each shape and its sensible default width and height.
+  - Added validated canvas drop handling with screen-to-canvas coordinate conversion.
+  - Added shared Liveblocks-backed canvas nodes with empty labels, the default node color, custom node type, dragged shape data, and shape-timestamp-counter IDs.
+  - Added the intentionally basic centered-label rectangular renderer for all custom canvas nodes.
+  - Verified with TypeScript, ESLint, and a production build.
+- Canvas issue remediation (`context/current-issues.md`):
+  - Replaced the padded three-column card layout with an edge-to-edge infinite
+    canvas and overlay project/AI sidebars.
+  - Corrected the hidden project-sidebar transform so it clears the viewport
+    completely.
+  - Hardened the drag payload with a browser-compatible fallback and centered
+    dropped nodes after React Flow pan/zoom coordinate projection.
+  - Added distinct SVG geometry for every supported canvas node shape.
+  - Made the dotted canvas background explicit and token-based.
+  - Verified with TypeScript, ESLint, and a production build.
 
 ## In Progress
 
@@ -85,7 +118,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Add canvas infrastructure in its dedicated feature unit.
+- Define the next canvas interaction feature.
 
 ## Open Questions
 
@@ -98,6 +131,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Prisma runtime connections branch by URL protocol: Prisma Postgres/Accelerate URLs use the official Accelerate extension, while direct PostgreSQL URLs use the `pg` driver adapter.
 - Missing and unauthorized workspace rooms share one access-denied response so project existence is not disclosed.
 - Collaborator access remains keyed by normalized email; Clerk is queried read-only for optional profile enrichment.
+- Liveblocks rooms are private by default; the auth route issues short-lived write access scoped to the authorized project room.
+- Cursor colors are deterministically derived from Clerk user IDs so identity color remains stable across sessions.
 
 ## Session Notes
 
@@ -129,3 +164,16 @@ Update this file whenever the current phase, active feature, or implementation s
 - Share dialog implementation started on 2026-07-02.
 - Share dialog implementation completed on 2026-07-02. `npx next typegen`, `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
 - Share access lists were refined on 2026-07-02 to always include the current project owner as a non-removable, Clerk-enriched owner row.
+- Liveblocks collaboration infrastructure implementation started on 2026-07-02.
+- Liveblocks collaboration infrastructure implementation completed on 2026-07-02. `npx next typegen`, `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
+- Base collaborative canvas implementation started on 2026-07-02.
+- Base collaborative canvas implementation completed on 2026-07-02. `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
+- Refined the React Flow minimap on 2026-07-02 with dark theme tokens plus enabled panning and zooming.
+- Corrected the minimap SVG background on 2026-07-02 through React Flow's `bgColor` API so empty rooms no longer expose its white default.
+- Refined the workspace navbar actions on 2026-07-02 into a consistent bordered action group with aligned Share, AI, and Clerk profile controls.
+- Enhanced the workspace AI toggle on 2026-07-02 with token-based indigo-to-cyan transitions, glow, lift, and sparkle hover motion.
+- Shape panel implementation started on 2026-07-02.
+- Shape panel implementation completed on 2026-07-02. `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
+- Canvas visual, sidebar overlay, drag-and-drop, and shape-rendering issues were
+  resolved on 2026-07-02. `npx tsc --noEmit`, `npm run lint`, and
+  `npm run build` pass.

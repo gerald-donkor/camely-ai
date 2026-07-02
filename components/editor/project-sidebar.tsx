@@ -16,7 +16,7 @@ import type { Project } from "@/types/project"
 interface ProjectSidebarProps {
   activeProjectId?: string
   isOpen: boolean
-  layout?: "overlay" | "docked"
+  layout?: "overlay" | "canvas-overlay"
   onClose: () => void
   onCreate: () => void
   onDelete: (project: Project) => void
@@ -130,11 +130,10 @@ export function ProjectSidebar({
         inert={!isOpen}
         className={cn(
           "fixed bottom-3 left-3 top-19 z-40 flex w-[min(20rem,calc(100vw-1.5rem))] flex-col rounded-2xl border border-surface-border bg-surface/95 shadow-2xl backdrop-blur-sm transition-transform duration-200 ease-out",
-          layout === "docked" &&
-            "lg:static lg:h-full lg:w-full lg:shadow-none",
+          layout === "canvas-overlay" && "absolute top-3",
           isOpen
             ? "translate-x-0"
-            : "-translate-x-[calc(100%+0.75rem)] pointer-events-none"
+            : "-translate-x-[calc(100%+1.5rem)] pointer-events-none",
         )}
       >
         <div className="flex items-center justify-between border-b border-surface-border px-4 py-3">
