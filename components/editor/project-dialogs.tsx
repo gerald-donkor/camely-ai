@@ -12,20 +12,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import type { ProjectDialogsController } from "@/hooks/use-project-dialogs"
+import type { ProjectActionsController } from "@/hooks/use-project-actions"
 
 interface ProjectDialogsProps {
-  controller: ProjectDialogsController
+  controller: ProjectActionsController
 }
 
 export function ProjectDialogs({ controller }: ProjectDialogsProps) {
   const {
     closeDialog,
     dialog,
+    errorMessage,
     isLoading,
     projectName,
+    roomIdPreview,
     setProjectName,
-    slugPreview,
     submitDialog,
   } = controller
 
@@ -58,7 +59,7 @@ export function ProjectDialogs({ controller }: ProjectDialogsProps) {
             <DialogDescription className="text-copy-muted">
               {isCreate && "Give your project a name to get started."}
               {isRename &&
-                `Rename “${dialog.project.name}”. The project slug will update with the new name.`}
+                `Choose a new name for “${dialog.project.name}”.`}
               {isDelete &&
                 `Permanently delete “${dialog.project.name}”? This action cannot be undone.`}
             </DialogDescription>
@@ -84,12 +85,18 @@ export function ProjectDialogs({ controller }: ProjectDialogsProps) {
                 disabled={isLoading}
                 onChange={(event) => setProjectName(event.target.value)}
               />
-              {isCreate && slugPreview && (
+              {isCreate && roomIdPreview && (
                 <p className="mt-2 font-mono text-xs text-copy-muted">
-                  {slugPreview}
+                  Room ID: {roomIdPreview}
                 </p>
               )}
             </div>
+          )}
+
+          {errorMessage && (
+            <p role="alert" className="mt-4 text-sm text-error">
+              {errorMessage}
+            </p>
           )}
 
           <DialogFooter className="-mx-4 -mb-4 mt-5 flex-row justify-end rounded-b-3xl border-surface-border bg-subtle/50 px-4 py-4">

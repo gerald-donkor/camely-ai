@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Project dialog and sidebar action foundation is complete; ready for the next feature unit.
+- Editor home project data and actions are wired; ready for the next feature unit.
 
 ## Completed
 
@@ -40,6 +40,21 @@ Update this file whenever the current phase, active feature, or implementation s
   - Wired both create actions and the sidebar rename/delete actions to local mock updates.
   - Added a mobile backdrop that closes the floating sidebar when tapped.
   - Verified with ESLint, TypeScript, and a production build.
+- Project APIs (`context/feature-specs/06-projects-apis.md`):
+  - Added authenticated project list and create handlers using the Clerk user ID as `ownerId`.
+  - Added owner-only rename and delete handlers with explicit `401`, `403`, and `404` responses.
+  - Added validated JSON request parsing and the `Untitled Project` create fallback.
+  - Restored the Prisma source schema, Prisma 7 PostgreSQL adapter client, and reproducible package dependencies represented by the generated client.
+  - Kept the feature backend-only; the existing mock project UI remains unchanged.
+  - Verified with Prisma validation and generation, Next.js route type generation, TypeScript, ESLint, and a production build.
+- Editor home API wiring (`context/feature-specs/07-wire-editor-home.md`):
+  - Converted `/editor` to a server-rendered project data boundary using Clerk identity and direct Prisma queries.
+  - Added separate owned and email-collaborated project lists and passed both into the client sidebar.
+  - Replaced mock project state with `useProjectActions` for create, rename, delete, dialog, loading, and error state.
+  - Added stable slug-plus-random-suffix room ID previews and persisted that room ID as the project ID.
+  - Added `/editor/[projectId]` workspace navigation and membership validation.
+  - Added sidebar project links, rename refreshes, and active-workspace delete redirects.
+  - Verified with Next.js route type generation, TypeScript, ESLint, and a production build.
 
 ## In Progress
 
@@ -47,7 +62,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Select the next feature unit after project dialogs.
+- Select the next feature unit.
 
 ## Open Questions
 
@@ -74,3 +89,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - Project dialogs implementation completed on 2026-06-29. `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
 - The create dialog was refined on 2026-06-29 to match the approved compact reference; slug generation remains internal to the mock project state.
 - The create dialog now reveals a live normalized slug beneath the input once a project name is entered, with explicit primary and placeholder text colors.
+- Project API implementation started on 2026-07-01.
+- Project API implementation completed on 2026-07-01. `npx prisma validate`, `npx prisma generate`, `npx next typegen`, `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
+- Project API route, helper, and Prisma sections were annotated on 2026-07-01 for easier code navigation.
+- Editor home API wiring started on 2026-07-01.
+- Editor home API wiring completed on 2026-07-01. `npx next typegen`, `npx tsc --noEmit`, `npm run lint`, and `npm run build` pass.
