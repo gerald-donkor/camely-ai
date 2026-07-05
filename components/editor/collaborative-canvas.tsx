@@ -21,7 +21,10 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 
-import { CanvasNodeRenderer } from "@/components/editor/canvas-node"
+import {
+  CanvasNodeEditingProvider,
+  CanvasNodeRenderer,
+} from "@/components/editor/canvas-node"
 import { ShapePanel } from "@/components/editor/shape-panel"
 import {
   DEFAULT_NODE_COLOR,
@@ -188,42 +191,69 @@ function LiveCanvas() {
     [onNodesChange],
   )
 
+  const updateNodeLabel = useCallback(
+    (nodeId: string, label: string) => {
+      const node = nodes.find(({ id }) => id === nodeId)
+
+      if (!node || node.data.label === label) {
+        return
+      }
+
+      onNodesChange([
+        {
+          id: nodeId,
+          item: {
+            ...node,
+            data: {
+              ...node.data,
+              label,
+            },
+          },
+          type: "replace",
+        },
+      ])
+    },
+    [nodes, onNodesChange],
+  )
+
   return (
     <div
       className="relative size-full bg-base"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <ReactFlow
-        connectionMode={ConnectionMode.Loose}
-        edges={edges}
-        fitView
-        nodes={nodes}
-        nodeTypes={nodeTypes}
-        className="bg-base"
-        onConnect={onConnect}
-        onDelete={onDelete}
-        onEdgesChange={onEdgesChange}
-        onInit={(instance) => {
-          reactFlowInstance.current = instance
-        }}
-        onNodesChange={onNodesChange}
-      >
-        <MiniMap
-          bgColor="var(--bg-base)"
-          className="rounded-xl border border-surface-border"
-          maskColor="var(--bg-elevated)"
-          nodeColor="var(--text-muted)"
-          pannable
-          zoomable
-        />
-        <Background
-          color="var(--border-subtle)"
-          gap={24}
-          size={1}
-          variant={BackgroundVariant.Dots}
-        />
-      </ReactFlow>
+      <CanvasNodeEditingProvider updateLabel={updateNodeLabel}>
+        <ReactFlow
+          connectionMode={ConnectionMode.Loose}
+          edges={edges}
+          fitView
+          nodes={nodes}
+          nodeTypes={nodeTypes}
+          className="bg-base"
+          onConnect={onConnect}
+          onDelete={onDelete}
+          onEdgesChange={onEdgesChange}
+          onInit={(instance) => {
+            reactFlowInstance.current = instance
+          }}
+          onNodesChange={onNodesChange}
+        >
+          <MiniMap
+            bgColor="var(--bg-base)"
+            className="rounded-xl border border-surface-border"
+            maskColor="var(--bg-elevated)"
+            nodeColor="var(--text-muted)"
+            pannable
+            zoomable
+          />
+          <Background
+            color="var(--border-subtle)"
+            gap={24}
+            size={1}
+            variant={BackgroundVariant.Dots}
+          />
+        </ReactFlow>
+      </CanvasNodeEditingProvider>
       <ShapePanel />
     </div>
   )

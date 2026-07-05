@@ -1,6 +1,11 @@
 "use client"
 
-import type { ComponentType, DragEvent, SVGProps } from "react"
+import {
+  type ComponentType,
+  type DragEvent,
+  type SVGProps,
+  useRef,
+} from "react"
 import {
   Circle,
   Cylinder,
@@ -10,7 +15,9 @@ import {
   RectangleHorizontal,
 } from "lucide-react"
 
+import { CanvasShape } from "@/components/editor/canvas-node"
 import {
+  DEFAULT_NODE_COLOR,
   SHAPE_DRAG_MIME_TYPE,
   type CanvasNodeShape,
   type ShapeDragPayload,
@@ -71,12 +78,58 @@ function handleDragStart(
   shape: CanvasNodeShape,
   width: number,
   height: number,
+  dragPreview: HTMLDivElement | null,
 ) {
   const payload: ShapeDragPayload = { shape, width, height }
 
   event.dataTransfer.effectAllowed = "copy"
   event.dataTransfer.setData(SHAPE_DRAG_MIME_TYPE, JSON.stringify(payload))
   event.dataTransfer.setData("text/plain", JSON.stringify(payload))
+
+  if (dragPreview) {
+    event.dataTransfer.setDragImage(dragPreview, width / 2, height / 2)
+  }
+}
+
+function ShapePanelItem({
+  shape,
+  label,
+  icon: Icon,
+  width,
+  height,
+}: ShapeOption) {
+  const dragPreviewRef = useRef<HTMLDivElement>(null)
+
+  return (
+    <>
+      <button
+        aria-label={`Drag ${label}`}
+        className="flex size-10 cursor-grab items-center justify-center rounded-full text-copy-muted transition-colors hover:bg-subtle hover:text-copy-primary active:cursor-grabbing"
+        draggable
+        onDragStart={(event) =>
+          handleDragStart(
+            event,
+            shape,
+            width,
+            height,
+            dragPreviewRef.current,
+          )
+        }
+        title={label}
+        type="button"
+      >
+        <Icon aria-hidden="true" className="size-5" />
+      </button>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed -left-[10000px] top-0 opacity-70"
+        ref={dragPreviewRef}
+        style={{ height, width }}
+      >
+        <CanvasShape color={DEFAULT_NODE_COLOR} shape={shape} />
+      </div>
+    </>
+  )
 }
 
 export function ShapePanel() {
@@ -86,20 +139,8 @@ export function ShapePanel() {
       className="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-surface-border bg-elevated/95 p-1.5 shadow-2xl backdrop-blur-sm"
       role="toolbar"
     >
-      {SHAPE_OPTIONS.map(({ shape, label, icon: Icon, width, height }) => (
-        <button
-          aria-label={`Drag ${label}`}
-          className="flex size-10 cursor-grab items-center justify-center rounded-full text-copy-muted transition-colors hover:bg-subtle hover:text-copy-primary active:cursor-grabbing"
-          draggable
-          key={shape}
-          onDragStart={(event) =>
-            handleDragStart(event, shape, width, height)
-          }
-          title={label}
-          type="button"
-        >
-          <Icon aria-hidden="true" className="size-5" />
-        </button>
+      {SHAPE_OPTIONS.map((option) => (
+        <ShapePanelItem key={option.shape} {...option} />
       ))}
     </div>
   )

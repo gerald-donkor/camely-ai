@@ -8,8 +8,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Canvas visual and drag-and-drop issue remediation is complete; ready for
-  further canvas interactions.
+- Canvas node editing is operational; ready for the next collaborative canvas
+  feature.
 
 ## Completed
 
@@ -111,6 +111,32 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added distinct SVG geometry for every supported canvas node shape.
   - Made the dotted canvas background explicit and token-based.
   - Verified with TypeScript, ESLint, and a production build.
+- Node shape rendering and drag preview (`context/feature-specs/13-node-shape.md`):
+  - Added shared shape visuals used by both collaborative nodes and drag previews.
+  - Rendered rectangle, pill, and circle with CSS and diamond, hexagon, and cylinder with scalable SVG geometry.
+  - Added subtle resting borders with brighter selected-node borders.
+  - Added shape-sized native drag previews centered on the cursor and automatically cleared when dragging ends.
+  - Kept existing Liveblocks node state, drop payloads, dimensions, and creation behavior unchanged.
+  - Verified with ESLint, TypeScript, and a production build.
+- Canvas node connection-handle remediation:
+  - Added React Flow handles to the top, right, bottom, and left of every custom node.
+  - Kept handles subtle at rest, revealed them on hover, and kept them visible while selected.
+  - Used the existing loose connection mode and Liveblocks `onConnect` flow so created edges remain collaborative.
+  - Corrected handle stacking above the full-node label layer and enlarged the invisible pointer target so React Flow can reliably resolve connection endpoints.
+  - Verified with ESLint, TypeScript, and a production build.
+- Node editing (`context/feature-specs/14-node-editing.md`):
+  - Added subtle resize controls to selected nodes with enforced minimum width
+    and height.
+  - Enlarged the invisible pointer targets around resize handles and edges while
+    retaining their subtle visual size.
+  - Kept resizing on React Flow's existing Liveblocks-backed node change flow.
+  - Added centered inline label editing on double-click with a stable empty-label
+    placeholder and an overlaid textarea.
+  - Synced label changes as users type through the existing collaborative node
+    state flow.
+  - Closed editing on blur or Escape and isolated textarea pointer, wheel, and
+    keyboard interactions from canvas dragging and panning.
+  - Verified with ESLint, TypeScript, and a production build.
 
 ## In Progress
 
@@ -118,7 +144,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Define the next canvas interaction feature.
+- Define the next collaborative canvas feature.
 
 ## Open Questions
 
@@ -177,3 +203,17 @@ Update this file whenever the current phase, active feature, or implementation s
 - Canvas visual, sidebar overlay, drag-and-drop, and shape-rendering issues were
   resolved on 2026-07-02. `npx tsc --noEmit`, `npm run lint`, and
   `npm run build` pass.
+- Node shape rendering and drag preview implementation started on 2026-07-05.
+- Node shape rendering and drag preview implementation completed on 2026-07-05.
+  `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
+- Canvas node connection-handle remediation started on 2026-07-05.
+- Canvas node connection-handle remediation completed on 2026-07-05.
+  `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
+- Canvas connection handle hit-testing remediation started on 2026-07-05.
+- Canvas connection handle hit-testing remediation completed on 2026-07-05.
+  `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
+- Node editing implementation started on 2026-07-05.
+- Node editing implementation completed on 2026-07-05. `npm run lint`,
+  `npx tsc --noEmit`, and `npm run build` pass.
+- Node resize hit-target remediation completed on 2026-07-05 with larger
+  invisible corner and edge grab areas.
