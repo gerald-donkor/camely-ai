@@ -8,6 +8,8 @@ import { EditorNavbar } from "@/components/editor/editor-navbar"
 import { ProjectDialogs } from "@/components/editor/project-dialogs"
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
 import { ShareDialog } from "@/components/editor/share-dialog"
+import type { CanvasTemplate } from "@/components/editor/starter-templates"
+import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal"
 import { useProjectActions } from "@/hooks/use-project-actions"
 import { useShareDialog } from "@/hooks/use-share-dialog"
 import type { Project } from "@/types/project"
@@ -25,6 +27,9 @@ export function ProjectWorkspace({
 }: ProjectWorkspaceProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(true)
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
+  const [templateToImport, setTemplateToImport] =
+    useState<CanvasTemplate | null>(null)
   const projectActions = useProjectActions({ activeProjectId: project.id })
   const shareDialog = useShareDialog({ projectId: project.id })
 
@@ -37,6 +42,7 @@ export function ProjectWorkspace({
         onAiSidebarToggle={() => setIsAiSidebarOpen((isOpen) => !isOpen)}
         onShare={shareDialog.openDialog}
         onSidebarToggle={() => setIsSidebarOpen((isOpen) => !isOpen)}
+        onStarterTemplates={() => setIsTemplatesOpen(true)}
       />
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -44,7 +50,11 @@ export function ProjectWorkspace({
           aria-label={`${project.name} canvas`}
           className="absolute inset-0 bg-base"
         >
-          <CollaborativeCanvas roomId={project.id} />
+          <CollaborativeCanvas
+            onTemplateImported={() => setTemplateToImport(null)}
+            roomId={project.id}
+            templateToImport={templateToImport}
+          />
         </main>
 
         <ProjectSidebar
@@ -64,7 +74,7 @@ export function ProjectWorkspace({
           aria-label="AI assistant"
           aria-hidden={!isAiSidebarOpen}
           inert={!isAiSidebarOpen}
-          className={`absolute bottom-3 right-3 top-3 z-40 flex w-[min(22rem,calc(100vw-1.5rem))] flex-col rounded-2xl border border-surface-border bg-surface/95 shadow-2xl backdrop-blur-sm transition-transform duration-200 ease-out ${
+          className={`absolute bottom-3 right-3 top-3 z-40 flex w-[min(19.5rem,calc(100vw-1.5rem))] flex-col rounded-2xl border border-surface-border bg-surface/95 shadow-2xl backdrop-blur-sm transition-transform duration-200 ease-out ${
             isAiSidebarOpen
               ? "translate-x-0"
               : "translate-x-[calc(100%+0.75rem)] pointer-events-none"
@@ -118,6 +128,11 @@ export function ProjectWorkspace({
         controller={shareDialog}
         isOwner={project.access === "owned"}
         projectName={project.name}
+      />
+      <StarterTemplatesModal
+        isOpen={isTemplatesOpen}
+        onImport={setTemplateToImport}
+        onOpenChange={setIsTemplatesOpen}
       />
     </div>
   )

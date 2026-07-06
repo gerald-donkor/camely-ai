@@ -6,11 +6,19 @@ import {
   type ErrorInfo,
   type ReactNode,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react"
 import { ClientSideSuspense } from "@liveblocks/react"
-import { LiveblocksProvider, RoomProvider } from "@liveblocks/react/suspense"
+import {
+  LiveblocksProvider,
+  RoomProvider,
+  useCanRedo,
+  useCanUndo,
+  useRedo,
+  useUndo,
+} from "@liveblocks/react/suspense"
 import { useLiveblocksFlow } from "@liveblocks/react-flow"
 import {
   Background,
@@ -19,10 +27,11 @@ import {
   ConnectionLineType,
   ConnectionMode,
   MarkerType,
-  MiniMap,
   ReactFlow,
   type Connection,
   type DefaultEdgeOptions,
+  type EdgeChange,
+  type NodeChange,
   type ReactFlowInstance,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -31,11 +40,14 @@ import {
   CanvasEdgeActionsProvider,
   CanvasEdgeRenderer,
 } from "@/components/editor/canvas-edge"
+import { CanvasControlBar } from "@/components/editor/canvas-control-bar"
 import {
   CanvasNodeActionsProvider,
   CanvasNodeRenderer,
 } from "@/components/editor/canvas-node"
 import { ShapePanel } from "@/components/editor/shape-panel"
+import type { CanvasTemplate } from "@/components/editor/starter-templates"
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import {
   DEFAULT_NODE_COLOR,
   DEFAULT_NODE_TEXT_COLOR,
@@ -48,7 +60,9 @@ import {
 } from "@/types/canvas"
 
 interface CollaborativeCanvasProps {
+  onTemplateImported?: () => void
   roomId: string
+  templateToImport?: CanvasTemplate | null
 }
 
 interface CanvasErrorBoundaryProps {
@@ -151,13 +165,48 @@ function CanvasStatus({ children }: { children: ReactNode }) {
   )
 }
 
-function LiveCanvas() {
+interface LiveCanvasProps {
+  onTemplateImported?: () => void
+  templateToImport?: CanvasTemplate | null
+}
+
+function cloneTemplateNode(node: CanvasNode): CanvasNode {
+  return {
+    ...node,
+    data: { ...node.data },
+    position: { ...node.position },
+    style: node.style ? { ...node.style } : undefined,
+  }
+}
+
+function cloneTemplateEdge(edge: CanvasEdge): CanvasEdge {
+  return {
+    ...edge,
+    data: edge.data ? { ...edge.data } : { label: "" },
+    markerEnd:
+      edge.markerEnd && typeof edge.markerEnd === "object"
+        ? { ...edge.markerEnd }
+        : edge.markerEnd,
+    style: edge.style ? { ...edge.style } : undefined,
+  }
+}
+
+function LiveCanvas({
+  onTemplateImported,
+  templateToImport,
+}: LiveCanvasProps) {
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null)
-  const reactFlowInstance = useRef<ReactFlowInstance<
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     CanvasNode,
     CanvasEdge
   > | null>(null)
   const nodeCounter = useRef(0)
+  const importedTemplateRef = useRef<CanvasTemplate | null>(null)
+  const pendingFitNodeIdsRef = useRef<Set<string> | null>(null)
+  const canRedo = useCanRedo()
+  const canUndo = useCanUndo()
+  const redo = useRedo()
+  const undo = useUndo()
   const {
     nodes,
     edges,
@@ -170,6 +219,86 @@ function LiveCanvas() {
     edges: { initial: [] },
   })
 
+  useKeyboardShortcuts({
+    reactFlowInstance,
+    redo,
+    undo,
+  })
+
+  useEffect(() => {
+    if (!templateToImport) {
+      importedTemplateRef.current = null
+      return
+    }
+
+    if (importedTemplateRef.current === templateToImport) {
+      return
+    }
+
+    importedTemplateRef.current = templateToImport
+    pendingFitNodeIdsRef.current = new Set(
+      templateToImport.nodes.map(({ id }) => id),
+    )
+    setEditingEdgeId(null)
+
+    const removeEdgeChanges: EdgeChange<CanvasEdge>[] = edges.map(
+      ({ id }) => ({ id, type: "remove" }),
+    )
+    const removeNodeChanges: NodeChange<CanvasNode>[] = nodes.map(
+      ({ id }) => ({ id, type: "remove" }),
+    )
+    const addNodeChanges: NodeChange<CanvasNode>[] =
+      templateToImport.nodes.map((node) => ({
+        item: cloneTemplateNode(node),
+        type: "add",
+      }))
+    const addEdgeChanges: EdgeChange<CanvasEdge>[] =
+      templateToImport.edges.map((edge) => ({
+        item: cloneTemplateEdge(edge),
+        type: "add",
+      }))
+
+    if (removeEdgeChanges.length > 0) {
+      onEdgesChange(removeEdgeChanges)
+    }
+    if (removeNodeChanges.length > 0) {
+      onNodesChange(removeNodeChanges)
+    }
+    if (addNodeChanges.length > 0) {
+      onNodesChange(addNodeChanges)
+    }
+    if (addEdgeChanges.length > 0) {
+      onEdgesChange(addEdgeChanges)
+    }
+
+    onTemplateImported?.()
+  }, [
+    edges,
+    nodes,
+    onEdgesChange,
+    onNodesChange,
+    onTemplateImported,
+    templateToImport,
+  ])
+
+  useEffect(() => {
+    const pendingNodeIds = pendingFitNodeIdsRef.current
+
+    if (
+      !reactFlowInstance ||
+      !pendingNodeIds ||
+      nodes.length !== pendingNodeIds.size ||
+      !nodes.every(({ id }) => pendingNodeIds.has(id))
+    ) {
+      return
+    }
+
+    pendingFitNodeIdsRef.current = null
+    window.requestAnimationFrame(() => {
+      void reactFlowInstance.fitView({ duration: 350, padding: 0.18 })
+    })
+  }, [nodes, reactFlowInstance])
+
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.dataTransfer.dropEffect = "copy"
@@ -180,7 +309,7 @@ function LiveCanvas() {
       event.preventDefault()
 
       const payload = readShapeDragPayload(event.dataTransfer)
-      const flow = reactFlowInstance.current
+      const flow = reactFlowInstance
 
       if (!payload || !flow) {
         return
@@ -213,7 +342,7 @@ function LiveCanvas() {
 
       onNodesChange([{ type: "add", item: node }])
     },
-    [onNodesChange],
+    [onNodesChange, reactFlowInstance],
   )
 
   const updateNodeLabel = useCallback(
@@ -370,19 +499,9 @@ function LiveCanvas() {
               setEditingEdgeId(edge.id)
             }}
             onEdgesChange={onEdgesChange}
-            onInit={(instance) => {
-              reactFlowInstance.current = instance
-            }}
+            onInit={setReactFlowInstance}
             onNodesChange={onNodesChange}
           >
-            <MiniMap
-              bgColor="var(--bg-base)"
-              className="rounded-xl border border-surface-border"
-              maskColor="var(--bg-elevated)"
-              nodeColor="var(--text-muted)"
-              pannable
-              zoomable
-            />
             <Background
               color="var(--border-subtle)"
               gap={24}
@@ -392,12 +511,23 @@ function LiveCanvas() {
           </ReactFlow>
         </CanvasEdgeActionsProvider>
       </CanvasNodeActionsProvider>
+      <CanvasControlBar
+        canRedo={canRedo}
+        canUndo={canUndo}
+        reactFlowInstance={reactFlowInstance}
+        redo={redo}
+        undo={undo}
+      />
       <ShapePanel />
     </div>
   )
 }
 
-export function CollaborativeCanvas({ roomId }: CollaborativeCanvasProps) {
+export function CollaborativeCanvas({
+  onTemplateImported,
+  roomId,
+  templateToImport,
+}: CollaborativeCanvasProps) {
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
       <RoomProvider
@@ -408,7 +538,10 @@ export function CollaborativeCanvas({ roomId }: CollaborativeCanvasProps) {
           <ClientSideSuspense
             fallback={<CanvasStatus>Loading collaborative canvas…</CanvasStatus>}
           >
-            <LiveCanvas />
+            <LiveCanvas
+              onTemplateImported={onTemplateImported}
+              templateToImport={templateToImport}
+            />
           </ClientSideSuspense>
         </CanvasErrorBoundary>
       </RoomProvider>

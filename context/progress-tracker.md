@@ -8,8 +8,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Custom edge behavior and inline labels are operational; ready for the next collaborative
-  canvas feature.
+- Starter templates can replace the active collaborative canvas; ready for the
+  next collaborative canvas feature.
 
 ## Completed
 
@@ -164,6 +164,28 @@ Update this file whenever the current phase, active feature, or implementation s
   - Synced new custom edges and label updates through the existing
     Liveblocks-backed edge change flow.
   - Verified with ESLint, TypeScript, and a production build.
+- Canvas ergonomics (`context/feature-specs/17-canvas-ergonomics.md`):
+  - Added a floating bottom-left control bar with animated zoom out, fit view,
+    and zoom in actions driven by the React Flow instance.
+  - Added Liveblocks-backed undo and redo controls with reactive disabled
+    states and dimmed disabled styling.
+  - Added window-level zoom and history keyboard shortcuts in
+    `hooks/useKeyboardShortcuts.ts`, with editable-field guards.
+  - Removed the React Flow minimap without changing the shape panel, nodes,
+    edges, or collaborative state setup.
+  - Verified with TypeScript, ESLint, and an isolated production build.
+- Starter templates (`context/feature-specs/18-starter-template.md`):
+  - Added typed microservices, CI/CD pipeline, and event-driven system
+    templates using the shared canvas node, edge, shape, and color contracts.
+  - Added a scrollable template dialog with descriptive cards and lightweight
+    SVG previews fitted from each template's calculated node bounds.
+  - Added a workspace navbar entry point and one-click import actions that
+    close the dialog after selection.
+  - Replaced existing collaborative nodes and edges through the established
+    Liveblocks React Flow change handlers before adding the selected template.
+  - Fit the canvas viewport after the imported graph reaches collaborative
+    state without adding server persistence or changing node/edge renderers.
+  - Verified with TypeScript, ESLint, and an isolated production build.
 
 ## In Progress
 
@@ -253,3 +275,26 @@ Update this file whenever the current phase, active feature, or implementation s
 - Edge behavior implementation completed on 2026-07-06. `npm run lint`,
   `npx tsc --noEmit`, and an isolated `npm run build` pass; the isolated build
   directory avoided the active development server's `.next` lock.
+- Canvas ergonomics implementation started on 2026-07-06.
+- Canvas ergonomics implementation completed on 2026-07-06. `npx tsc
+  --noEmit`, `npm run lint`, and an isolated `npm run build` pass; the normal
+  build directory remained locked by the active development environment.
+- Narrowed the workspace AI assistant panel to a 19.5rem desktop width on
+  2026-07-06 while preserving its viewport-aware mobile cap.
+- Starter template implementation started on 2026-07-06.
+- Starter template implementation completed on 2026-07-06. `npx tsc
+  --noEmit`, `npm run lint`, and an isolated `npm run build` pass; the normal
+  build directory remained locked by the active development environment.
+- Starter template dialog visual refinement started on 2026-07-06 to align its
+  sizing, three-card layout, preview treatment, and import actions with the
+  approved reference.
+- Starter template dialog visual refinement completed on 2026-07-06 with a
+  centered 57rem modal, compact three-card layout, simplified dark diagram
+  previews, replacement/undo guidance, and full-width outline import actions.
+  `npx tsc --noEmit` and `npm run lint` pass.
+- Added a serverless web application starter template on 2026-07-06 covering
+  CDN delivery, managed API functions, storage, task queues, background work,
+  and notifications. `npx tsc --noEmit` and `npm run lint` pass.
+- Refined the starter template dialog on 2026-07-06 so all template cards stay
+  in one horizontal row, with a wider desktop modal and horizontal overflow on
+  smaller viewports. `npx tsc --noEmit` and `npm run lint` pass.
