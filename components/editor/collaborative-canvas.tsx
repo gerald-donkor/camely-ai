@@ -22,16 +22,18 @@ import {
 import "@xyflow/react/dist/style.css"
 
 import {
-  CanvasNodeEditingProvider,
+  CanvasNodeActionsProvider,
   CanvasNodeRenderer,
 } from "@/components/editor/canvas-node"
 import { ShapePanel } from "@/components/editor/shape-panel"
 import {
   DEFAULT_NODE_COLOR,
+  DEFAULT_NODE_TEXT_COLOR,
   NODE_SHAPES,
   SHAPE_DRAG_MIME_TYPE,
   type CanvasEdge,
   type CanvasNode,
+  type NodeColorPair,
   type ShapeDragPayload,
 } from "@/types/canvas"
 
@@ -179,6 +181,7 @@ function LiveCanvas() {
           label: "",
           color: DEFAULT_NODE_COLOR,
           shape: payload.shape,
+          textColor: DEFAULT_NODE_TEXT_COLOR,
         },
         style: {
           width: payload.width,
@@ -216,13 +219,48 @@ function LiveCanvas() {
     [nodes, onNodesChange],
   )
 
+  const updateNodeColors = useCallback(
+    (
+      nodeId: string,
+      { color, textColor }: Pick<NodeColorPair, "color" | "textColor">,
+    ) => {
+      const node = nodes.find(({ id }) => id === nodeId)
+
+      if (
+        !node ||
+        (node.data.color === color && node.data.textColor === textColor)
+      ) {
+        return
+      }
+
+      onNodesChange([
+        {
+          id: nodeId,
+          item: {
+            ...node,
+            data: {
+              ...node.data,
+              color,
+              textColor,
+            },
+          },
+          type: "replace",
+        },
+      ])
+    },
+    [nodes, onNodesChange],
+  )
+
   return (
     <div
       className="relative size-full bg-base"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <CanvasNodeEditingProvider updateLabel={updateNodeLabel}>
+      <CanvasNodeActionsProvider
+        updateColors={updateNodeColors}
+        updateLabel={updateNodeLabel}
+      >
         <ReactFlow
           connectionMode={ConnectionMode.Loose}
           edges={edges}
@@ -253,7 +291,7 @@ function LiveCanvas() {
             variant={BackgroundVariant.Dots}
           />
         </ReactFlow>
-      </CanvasNodeEditingProvider>
+      </CanvasNodeActionsProvider>
       <ShapePanel />
     </div>
   )

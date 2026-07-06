@@ -1,5 +1,6 @@
 import {
   createContext,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
   useContext,
@@ -10,11 +11,18 @@ import {
 import {
   Handle,
   NodeResizer,
+  NodeToolbar,
   Position,
   type NodeProps,
 } from "@xyflow/react"
 
-import type { CanvasNode, CanvasNodeShape } from "@/types/canvas"
+import {
+  DEFAULT_NODE_TEXT_COLOR,
+  NODE_COLORS,
+  type CanvasNode,
+  type CanvasNodeShape,
+  type NodeColorPair,
+} from "@/types/canvas"
 import { cn } from "@/lib/utils"
 
 interface CanvasShapeProps {
@@ -23,12 +31,16 @@ interface CanvasShapeProps {
   shape: CanvasNodeShape
 }
 
-interface CanvasNodeEditingContextValue {
+interface CanvasNodeActionsContextValue {
+  updateColors: (
+    nodeId: string,
+    colorPair: Pick<NodeColorPair, "color" | "textColor">,
+  ) => void
   updateLabel: (nodeId: string, label: string) => void
 }
 
-interface CanvasNodeEditingProviderProps
-  extends CanvasNodeEditingContextValue {
+interface CanvasNodeActionsProviderProps
+  extends CanvasNodeActionsContextValue {
   children: ReactNode
 }
 
@@ -36,17 +48,18 @@ const RESTING_BORDER = "var(--border-subtle)"
 const SELECTED_BORDER = "var(--text-secondary)"
 const MIN_NODE_WIDTH = 80
 const MIN_NODE_HEIGHT = 48
-const CanvasNodeEditingContext =
-  createContext<CanvasNodeEditingContextValue | null>(null)
+const CanvasNodeActionsContext =
+  createContext<CanvasNodeActionsContextValue | null>(null)
 
-export function CanvasNodeEditingProvider({
+export function CanvasNodeActionsProvider({
   children,
+  updateColors,
   updateLabel,
-}: CanvasNodeEditingProviderProps) {
+}: CanvasNodeActionsProviderProps) {
   return (
-    <CanvasNodeEditingContext value={{ updateLabel }}>
+    <CanvasNodeActionsContext value={{ updateColors, updateLabel }}>
       {children}
-    </CanvasNodeEditingContext>
+    </CanvasNodeActionsContext>
   )
 }
 
@@ -116,9 +129,13 @@ export function CanvasNodeRenderer({
   isConnectable,
   selected,
 }: NodeProps<CanvasNode>) {
-  const editingContext = useContext(CanvasNodeEditingContext)
+  const nodeActions = useContext(CanvasNodeActionsContext)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const activeColorPair =
+    NODE_COLORS.find(({ color }) => color === data.color) ?? NODE_COLORS[0]
+  const textColor =
+    data.textColor ?? activeColorPair.textColor ?? DEFAULT_NODE_TEXT_COLOR
   const handleClassName = cn(
     "!z-20 !size-2 !border !border-base !bg-copy-primary !transition-opacity after:absolute after:-inset-2 after:content-['']",
     selected ? "!opacity-100" : "!opacity-0 group-hover:!opacity-100",
@@ -146,7 +163,45 @@ export function CanvasNodeRenderer({
   }
 
   return (
-    <div className="group relative size-full text-copy-primary">
+    <div className="group relative size-full" style={{ color: textColor }}>
+      <NodeToolbar
+        className="nodrag nopan nowheel flex items-center gap-1.5 rounded-xl border border-surface-border bg-elevated/95 p-1.5 shadow-xl backdrop-blur-sm"
+        isVisible={selected}
+        offset={12}
+        position={Position.Top}
+      >
+        {NODE_COLORS.map((colorPair) => {
+          const isActive =
+            data.color === colorPair.color &&
+            textColor === colorPair.textColor
+
+          return (
+            <button
+              aria-label={`Use ${colorPair.name} node colors`}
+              aria-pressed={isActive}
+              className={cn(
+                "size-5 rounded-full border transition-[box-shadow,transform] hover:shadow-[0_0_7px_var(--swatch-glow)]",
+                isActive && "scale-110",
+              )}
+              key={colorPair.color}
+              onClick={() => nodeActions?.updateColors(id, colorPair)}
+              onPointerDown={(event) => event.stopPropagation()}
+              style={{
+                "--swatch-glow": colorPair.textColor,
+                backgroundColor: colorPair.color,
+                borderColor: isActive
+                  ? colorPair.textColor
+                  : "var(--border-subtle)",
+                boxShadow: isActive
+                  ? `0 0 0 1px var(--bg-base), 0 0 0 2px ${colorPair.textColor}`
+                  : undefined,
+              } as CSSProperties}
+              title={colorPair.name}
+              type="button"
+            />
+          )
+        })}
+      </NodeToolbar>
       <NodeResizer
         color="var(--text-muted)"
         handleClassName="!z-30 !size-2 !touch-none !rounded-full !border !border-base !bg-copy-muted after:absolute after:-inset-2 after:rounded-full after:bg-transparent after:content-['']"
@@ -191,10 +246,10 @@ export function CanvasNodeRenderer({
       {isEditing ? (
         <textarea
           aria-label="Node label"
-          className="nodrag nopan nowheel absolute inset-0 z-20 size-full resize-none overflow-hidden border-0 bg-transparent px-4 text-center text-sm text-copy-primary outline-none placeholder:text-copy-faint"
+          className="nodrag nopan nowheel absolute inset-0 z-20 size-full resize-none overflow-hidden border-0 bg-transparent px-4 text-center text-sm text-current outline-none placeholder:text-current placeholder:opacity-40"
           onBlur={finishEditing}
           onChange={(event) =>
-            editingContext?.updateLabel(id, event.target.value)
+            nodeActions?.updateLabel(id, event.target.value)
           }
           onDoubleClick={(event) => event.stopPropagation()}
           onKeyDown={handleEditorKeyDown}
@@ -212,9 +267,7 @@ export function CanvasNodeRenderer({
             setIsEditing(true)
           }}
         >
-          {data.label || (
-            <span className="text-copy-faint">Add label</span>
-          )}
+          {data.label || <span className="opacity-40">Add label</span>}
         </div>
       )}
     </div>

@@ -8,8 +8,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Canvas node editing is operational; ready for the next collaborative canvas
-  feature.
+- Canvas node color themes are operational; ready for the next collaborative
+  canvas feature.
 
 ## Completed
 
@@ -137,6 +137,18 @@ Update this file whenever the current phase, active feature, or implementation s
   - Closed editing on blur or Escape and isolated textarea pointer, wheel, and
     keyboard interactions from canvas dragging and panning.
   - Verified with ESLint, TypeScript, and a production build.
+- Node color toolbar (`context/feature-specs/15-nodes-color-toolbar.md`):
+  - Added the eight documented background and matching text-color pairs as
+    typed canvas constants.
+  - Added a compact floating toolbar above selected nodes with one accessible
+    swatch per color pair.
+  - Added clear active-swatch treatment and tight text-color-based hover glows.
+  - Prevented toolbar interactions from dragging nodes or panning the canvas.
+  - Synced background and text-color changes together through the existing
+    Liveblocks-backed node change flow without server calls.
+  - Kept existing collaborative nodes backward-compatible by deriving missing
+    text colors from their stored background color.
+  - Verified with ESLint, TypeScript, and a production build.
 
 ## In Progress
 
@@ -217,3 +229,6 @@ Update this file whenever the current phase, active feature, or implementation s
   `npx tsc --noEmit`, and `npm run build` pass.
 - Node resize hit-target remediation completed on 2026-07-05 with larger
   invisible corner and edge grab areas.
+- Node color toolbar implementation started on 2026-07-05.
+- Node color toolbar implementation completed on 2026-07-05. `npm run lint`,
+  `npx tsc --noEmit`, and `npm run build` pass.
