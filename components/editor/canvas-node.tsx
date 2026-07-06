@@ -167,6 +167,7 @@ export function CanvasNodeRenderer({
       <NodeToolbar
         className="nodrag nopan nowheel flex items-center gap-1.5 rounded-xl border border-surface-border bg-elevated/95 p-1.5 shadow-xl backdrop-blur-sm"
         isVisible={selected}
+        nodeId={id}
         offset={12}
         position={Position.Top}
       >
@@ -180,12 +181,24 @@ export function CanvasNodeRenderer({
               aria-label={`Use ${colorPair.name} node colors`}
               aria-pressed={isActive}
               className={cn(
-                "size-5 rounded-full border transition-[box-shadow,transform] hover:shadow-[0_0_7px_var(--swatch-glow)]",
+                "nodrag nopan size-6 touch-none rounded-full border transition-[box-shadow,transform] hover:shadow-[0_0_7px_var(--swatch-glow)]",
                 isActive && "scale-110",
               )}
               key={colorPair.color}
-              onClick={() => nodeActions?.updateColors(id, colorPair)}
-              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                if (event.detail === 0) {
+                  nodeActions?.updateColors(id, colorPair)
+                }
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+              onPointerDown={(event) => {
+                event.stopPropagation()
+
+                if (event.button === 0) {
+                  event.preventDefault()
+                  nodeActions?.updateColors(id, colorPair)
+                }
+              }}
               style={{
                 "--swatch-glow": colorPair.textColor,
                 backgroundColor: colorPair.color,

@@ -7,6 +7,7 @@ import {
   type ReactNode,
   useCallback,
   useRef,
+  useState,
 } from "react"
 import { ClientSideSuspense } from "@liveblocks/react"
 import { LiveblocksProvider, RoomProvider } from "@liveblocks/react/suspense"
@@ -14,13 +15,22 @@ import { useLiveblocksFlow } from "@liveblocks/react-flow"
 import {
   Background,
   BackgroundVariant,
+  addEdge,
+  ConnectionLineType,
   ConnectionMode,
+  MarkerType,
   MiniMap,
   ReactFlow,
+  type Connection,
+  type DefaultEdgeOptions,
   type ReactFlowInstance,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 
+import {
+  CanvasEdgeActionsProvider,
+  CanvasEdgeRenderer,
+} from "@/components/editor/canvas-edge"
 import {
   CanvasNodeActionsProvider,
   CanvasNodeRenderer,
@@ -52,6 +62,18 @@ interface CanvasErrorBoundaryState {
 const nodeTypes = {
   canvasNode: CanvasNodeRenderer,
 }
+
+const edgeTypes = {
+  canvasEdge: CanvasEdgeRenderer,
+}
+
+const defaultEdgeOptions = {
+  interactionWidth: 24,
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+  },
+  type: "canvasEdge",
+} satisfies DefaultEdgeOptions
 
 function isShapeDragPayload(value: unknown): value is ShapeDragPayload {
   if (!value || typeof value !== "object") {
@@ -130,6 +152,7 @@ function CanvasStatus({ children }: { children: ReactNode }) {
 }
 
 function LiveCanvas() {
+  const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null)
   const reactFlowInstance = useRef<ReactFlowInstance<
     CanvasNode,
     CanvasEdge
@@ -140,7 +163,6 @@ function LiveCanvas() {
     edges,
     onNodesChange,
     onEdgesChange,
-    onConnect,
     onDelete,
   } = useLiveblocksFlow<CanvasNode, CanvasEdge>({
     suspense: true,
@@ -251,6 +273,67 @@ function LiveCanvas() {
     [nodes, onNodesChange],
   )
 
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      const nextEdges = addEdge<CanvasEdge>(connection, edges)
+
+      if (nextEdges.length === edges.length) {
+        return
+      }
+
+      const addedEdge = nextEdges.at(-1)
+
+      if (!addedEdge) {
+        return
+      }
+
+      onEdgesChange([
+        {
+          item: {
+            ...addedEdge,
+            data: { label: "" },
+            interactionWidth: defaultEdgeOptions.interactionWidth,
+            markerEnd: defaultEdgeOptions.markerEnd,
+            type: "canvasEdge",
+          },
+          type: "add",
+        },
+      ])
+    },
+    [edges, onEdgesChange],
+  )
+
+  const updateEdgeLabel = useCallback(
+    (edgeId: string, label: string) => {
+      const edge = edges.find(({ id }) => id === edgeId)
+
+      if (!edge || edge.data?.label === label) {
+        return
+      }
+
+      onEdgesChange([
+        {
+          id: edgeId,
+          item: {
+            ...edge,
+            data: {
+              ...edge.data,
+              label,
+            },
+          },
+          type: "replace",
+        },
+      ])
+    },
+    [edges, onEdgesChange],
+  )
+
+  const finishEdgeEditing = useCallback((edgeId: string) => {
+    setEditingEdgeId((currentEdgeId) =>
+      currentEdgeId === edgeId ? null : currentEdgeId,
+    )
+  }, [])
+
   return (
     <div
       className="relative size-full bg-base"
@@ -261,36 +344,53 @@ function LiveCanvas() {
         updateColors={updateNodeColors}
         updateLabel={updateNodeLabel}
       >
-        <ReactFlow
-          connectionMode={ConnectionMode.Loose}
-          edges={edges}
-          fitView
-          nodes={nodes}
-          nodeTypes={nodeTypes}
-          className="bg-base"
-          onConnect={onConnect}
-          onDelete={onDelete}
-          onEdgesChange={onEdgesChange}
-          onInit={(instance) => {
-            reactFlowInstance.current = instance
-          }}
-          onNodesChange={onNodesChange}
+        <CanvasEdgeActionsProvider
+          editingEdgeId={editingEdgeId}
+          finishEditing={finishEdgeEditing}
+          updateLabel={updateEdgeLabel}
         >
-          <MiniMap
-            bgColor="var(--bg-base)"
-            className="rounded-xl border border-surface-border"
-            maskColor="var(--bg-elevated)"
-            nodeColor="var(--text-muted)"
-            pannable
-            zoomable
-          />
-          <Background
-            color="var(--border-subtle)"
-            gap={24}
-            size={1}
-            variant={BackgroundVariant.Dots}
-          />
-        </ReactFlow>
+          <ReactFlow
+            connectionLineStyle={{
+              stroke: "var(--text-secondary)",
+              strokeWidth: 1.5,
+            }}
+            connectionLineType={ConnectionLineType.SmoothStep}
+            connectionMode={ConnectionMode.Loose}
+            defaultEdgeOptions={defaultEdgeOptions}
+            edges={edges}
+            edgeTypes={edgeTypes}
+            fitView
+            nodes={nodes}
+            nodeTypes={nodeTypes}
+            className="bg-base"
+            onConnect={handleConnect}
+            onDelete={onDelete}
+            onEdgeDoubleClick={(event, edge) => {
+              event.stopPropagation()
+              setEditingEdgeId(edge.id)
+            }}
+            onEdgesChange={onEdgesChange}
+            onInit={(instance) => {
+              reactFlowInstance.current = instance
+            }}
+            onNodesChange={onNodesChange}
+          >
+            <MiniMap
+              bgColor="var(--bg-base)"
+              className="rounded-xl border border-surface-border"
+              maskColor="var(--bg-elevated)"
+              nodeColor="var(--text-muted)"
+              pannable
+              zoomable
+            />
+            <Background
+              color="var(--border-subtle)"
+              gap={24}
+              size={1}
+              variant={BackgroundVariant.Dots}
+            />
+          </ReactFlow>
+        </CanvasEdgeActionsProvider>
       </CanvasNodeActionsProvider>
       <ShapePanel />
     </div>

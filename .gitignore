@@ -11,6 +11,9 @@
 !.yarn/versions
 /context/current-issues.md
 
+# Local development scripts
+start-dev.ps1
+
 # testing
 /coverage
 

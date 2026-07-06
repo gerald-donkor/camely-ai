@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Canvas node color themes are operational; ready for the next collaborative
+- Custom edge behavior and inline labels are operational; ready for the next collaborative
   canvas feature.
 
 ## Completed
@@ -149,6 +149,21 @@ Update this file whenever the current phase, active feature, or implementation s
   - Kept existing collaborative nodes backward-compatible by deriving missing
     text colors from their stored background color.
   - Verified with ESLint, TypeScript, and a production build.
+- Edge behavior (`context/feature-specs/16-edge-behavior.md`):
+  - Kept four-way loose connection handles on every node with subtle
+    hover-and-selection visibility.
+  - Added custom smooth-step edge rendering with rounded light strokes,
+    arrowheads, dimmed resting treatment, and brighter hover and selection
+    states.
+  - Enlarged the invisible edge interaction width without increasing the
+    visible stroke thickness.
+  - Added midpoint labels through `EdgeLabelRenderer` and the coordinates
+    returned by `getSmoothStepPath`.
+  - Added growing inline label inputs opened by edge double-click, with saves
+    on blur, Enter, or Escape and pill badges for saved labels.
+  - Synced new custom edges and label updates through the existing
+    Liveblocks-backed edge change flow.
+  - Verified with ESLint, TypeScript, and a production build.
 
 ## In Progress
 
@@ -232,3 +247,9 @@ Update this file whenever the current phase, active feature, or implementation s
 - Node color toolbar implementation started on 2026-07-05.
 - Node color toolbar implementation completed on 2026-07-05. `npm run lint`,
   `npx tsc --noEmit`, and `npm run build` pass.
+- Node color toolbar pointer handling was remediated on 2026-07-06 by binding
+  each toolbar to its node explicitly and applying mouse/touch swatch changes
+  on primary pointer down before React Flow can consume the gesture.
+- Edge behavior implementation completed on 2026-07-06. `npm run lint`,
+  `npx tsc --noEmit`, and an isolated `npm run build` pass; the isolated build
+  directory avoided the active development server's `.next` lock.
