@@ -3,14 +3,44 @@
 import {
   type FormEvent,
   type KeyboardEvent,
+  useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react"
-import { Bot, Download, FileText, Send, X } from "lucide-react"
+import { useRealtimeRun } from "@trigger.dev/react-hooks"
+import { LiveList } from "@liveblocks/client"
+import {
+  useMutation,
+  useSelf,
+  useStorage,
+} from "@liveblocks/react"
+import {
+  Bot,
+  Download,
+  FileText,
+  LoaderCircle,
+  Send,
+  X,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import {
+  AI_AGENT_COLOR,
+  AI_AGENT_NAME,
+  AI_AGENT_USER_ID,
+  isAiStatusFeedActive,
+  type AiDesignStatusMessage,
+} from "@/types/ai-design"
+import { NODE_COLORS } from "@/types/canvas"
+import {
+  AI_CHAT_FEED_KEY,
+  isAiChatMessage,
+  type AiChatMessage,
+} from "@/types/tasks"
+import type { designAgent } from "@/src/trigger/design-agent"
 
 const ARCHITECT_SUGGESTIONS = [
   "Design an e-commerce backend",
@@ -20,44 +50,233 @@ const ARCHITECT_SUGGESTIONS = [
 
 type AiWorkspaceTab = "architect" | "specs"
 
+interface ActiveDesignRun {
+  publicToken: string
+  runId: string
+}
+
+interface DesignRunResponse {
+  publicToken: string
+  runId: string
+}
+
 interface AiWorkspaceSidebarProps {
   isOpen: boolean
   onClose: () => void
+  roomId: string
+  statusMessages: readonly AiDesignStatusMessage[]
 }
+
+const USER_MESSAGE_COLOR =
+  NODE_COLORS.find(({ name }) => name === "Green") ?? NODE_COLORS[0]
+
+type DesignRealtimeRun = NonNullable<
+  ReturnType<typeof useRealtimeRun<typeof designAgent>>["run"]
+>
 
 export function AiWorkspaceSidebar({
   isOpen,
   onClose,
+  roomId,
+  statusMessages,
 }: AiWorkspaceSidebarProps) {
   const [activeTab, setActiveTab] =
     useState<AiWorkspaceTab>("architect")
   const [prompt, setPrompt] = useState("")
   const [specVersion, setSpecVersion] = useState(1)
-  const [submittedPrompts, setSubmittedPrompts] = useState<string[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeRun, setActiveRun] = useState<ActiveDesignRun | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const completedRunIdsRef = useRef<Set<string>>(new Set())
+  const subscriptionErrorRunIdsRef = useRef<Set<string>>(new Set())
+  const latestStatusMessageRef = useRef<AiDesignStatusMessage | null>(null)
   const trimmedPrompt = prompt.trim()
+  const latestStatusMessage = statusMessages.at(-1) ?? null
+  const isAiWorking = isAiStatusFeedActive(latestStatusMessage)
+  const isDesignRunActive = Boolean(activeRun)
+  const isComposerDisabled = isSubmitting || isDesignRunActive
+  const self = useSelf()
+  const chatMessages =
+    useStorage(
+      (root) =>
+        (root[AI_CHAT_FEED_KEY] ?? []).filter(isAiChatMessage),
+    ) ?? []
+  const pushChatMessage = useMutation(
+    ({ storage }, message: AiChatMessage) => {
+      let feed = storage.get(AI_CHAT_FEED_KEY)
+
+      if (!feed) {
+        feed = new LiveList<AiChatMessage>([])
+        storage.set(AI_CHAT_FEED_KEY, feed)
+      }
+
+      feed.push(message)
+    },
+    [],
+  )
+  const hasArchitectActivity =
+    chatMessages.length > 0 ||
+    isDesignRunActive ||
+    isSubmitting
+
+  useEffect(() => {
+    latestStatusMessageRef.current = latestStatusMessage
+  }, [latestStatusMessage])
+
+  const pushAiMessage = useCallback(
+    (content: string, role: AiChatMessage["role"] = "assistant") => {
+      pushChatMessage({
+        content,
+        id: createChatMessageId(),
+        role,
+        roomId,
+        sender: {
+          avatar: "",
+          color: AI_AGENT_COLOR,
+          id: AI_AGENT_USER_ID,
+          name: AI_AGENT_NAME,
+        },
+        timestamp: new Date().toISOString(),
+        type: "ai-chat",
+      })
+    },
+    [pushChatMessage, roomId],
+  )
+
+  const handleRunComplete = useCallback(
+    (run: DesignRealtimeRun, error?: Error) => {
+      if (completedRunIdsRef.current.has(run.id)) {
+        return
+      }
+
+      completedRunIdsRef.current.add(run.id)
+
+      const latestStatus = latestStatusMessageRef.current
+      const statusText =
+        latestStatus?.runId === run.id ? latestStatus.text?.trim() : undefined
+      const failedMessage =
+        error?.message ||
+        run.error?.message ||
+        `Design generation ended with ${formatRunStatus(run.status)}.`
+
+      pushAiMessage(
+        run.status === "COMPLETED"
+          ? statusText || "Canvas updated."
+          : failedMessage,
+        run.status === "COMPLETED" ? "assistant" : "system",
+      )
+      setActiveRun((currentRun) =>
+        currentRun?.runId === run.id ? null : currentRun,
+      )
+      setIsSubmitting(false)
+      window.requestAnimationFrame(() => textareaRef.current?.focus())
+    },
+    [pushAiMessage],
+  )
+  const {
+    error: realtimeError,
+    run: realtimeRun,
+  } = useRealtimeRun<typeof designAgent>(activeRun?.runId, {
+    accessToken: activeRun?.publicToken,
+    enabled: Boolean(activeRun),
+    onComplete: handleRunComplete,
+    skipColumns: ["payload", "output"],
+  })
+
+  useEffect(() => {
+    if (!activeRun || !realtimeError) {
+      return
+    }
+
+    if (subscriptionErrorRunIdsRef.current.has(activeRun.runId)) {
+      return
+    }
+
+    subscriptionErrorRunIdsRef.current.add(activeRun.runId)
+    completedRunIdsRef.current.add(activeRun.runId)
+    pushAiMessage(
+      `Unable to track the design run: ${realtimeError.message}`,
+      "system",
+    )
+    setActiveRun(null)
+    setIsSubmitting(false)
+  }, [activeRun, pushAiMessage, realtimeError])
 
   function selectSuggestion(suggestion: string) {
     setPrompt(suggestion)
     window.requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
-  function submitPrompt() {
-    if (!trimmedPrompt) {
+  async function submitPrompt() {
+    if (!trimmedPrompt || isComposerDisabled) {
       return
     }
 
-    setSubmittedPrompts((currentPrompts) => [
-      ...currentPrompts,
-      trimmedPrompt,
-    ])
-    setPrompt("")
-    window.requestAnimationFrame(() => textareaRef.current?.focus())
+    const submittedPrompt = trimmedPrompt
+    const senderInfo = self?.info
+
+    setIsSubmitting(true)
+
+    try {
+      pushChatMessage({
+        content: submittedPrompt,
+        id: createChatMessageId(),
+        role: "user",
+        roomId,
+        sender: {
+          avatar: senderInfo?.avatar,
+          color: senderInfo?.color,
+          id: self?.id ?? "unknown-user",
+          name: senderInfo?.name || "Unknown user",
+        },
+        timestamp: new Date().toISOString(),
+        type: "ai-chat",
+      })
+      setPrompt("")
+
+      const response = await fetch("/api/ai/design", {
+        body: JSON.stringify({
+          prompt: submittedPrompt,
+          roomId,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      })
+      const payload: unknown = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(readErrorMessage(payload, response.status))
+      }
+
+      if (!isDesignRunResponse(payload)) {
+        throw new Error("Design generation returned an invalid run handle.")
+      }
+
+      setActiveRun({
+        publicToken: payload.publicToken,
+        runId: payload.runId,
+      })
+    } catch (error) {
+      pushAiMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to start design generation.",
+        "system",
+      )
+      setIsSubmitting(false)
+      window.requestAnimationFrame(() => textareaRef.current?.focus())
+    } finally {
+      if (!activeRun) {
+        setIsSubmitting(false)
+      }
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    submitPrompt()
+    void submitPrompt()
   }
 
   function handleComposerKeyDown(
@@ -72,7 +291,7 @@ export function AiWorkspaceSidebar({
     }
 
     event.preventDefault()
-    submitPrompt()
+    void submitPrompt()
   }
 
   return (
@@ -96,8 +315,16 @@ export function AiWorkspaceSidebar({
           <h2 className="truncate text-sm font-semibold text-copy-primary">
             AI Workspace
           </h2>
-          <p className="truncate text-xs text-copy-muted">
-            Collaborate with Ghost AI
+          <p className="flex items-center gap-1.5 truncate text-xs text-copy-muted">
+            {isAiWorking && (
+              <span
+                aria-hidden="true"
+                className="size-1.5 shrink-0 rounded-full bg-ai-text shadow-[0_0_10px_var(--accent-ai)]"
+              />
+            )}
+            <span className="truncate">
+              {isAiWorking ? "Camely AI is working" : "Collaborate with Ghost AI"}
+            </span>
           </p>
         </div>
         <Button
@@ -159,17 +386,16 @@ export function AiWorkspaceSidebar({
           role="tabpanel"
         >
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-            {submittedPrompts.length === 0 ? (
+            {!hasArchitectActivity ? (
               <div className="flex min-h-full flex-col items-center pt-12 text-center">
                 <div className="flex size-11 items-center justify-center rounded-2xl bg-ai/15 text-ai-text ring-1 ring-ai/25">
                   <Bot aria-hidden="true" className="size-5" />
                 </div>
                 <h3 className="mt-4 text-sm font-semibold text-copy-primary">
-                  Camely AI Architect
+                  Room chat
                 </h3>
                 <p className="mt-1.5 max-w-60 text-xs leading-5 text-copy-muted">
-                  Describe your system and I&apos;ll help you design the
-                  architecture.
+                  Ask Camely AI to design or revise the shared architecture.
                 </p>
                 <div className="mt-5 flex w-full flex-col gap-2">
                   {ARCHITECT_SUGGESTIONS.map((suggestion) => (
@@ -185,25 +411,17 @@ export function AiWorkspaceSidebar({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-3 pt-5">
-                {submittedPrompts.map((submittedPrompt, index) => (
-                  <div
-                    key={`${submittedPrompt}-${index}`}
-                    className="ml-8 rounded-2xl rounded-br-xl border border-ai/25 bg-ai/10 px-3 py-2.5 text-sm leading-5 text-copy-primary"
-                  >
-                    {submittedPrompt}
-                  </div>
-                ))}
-                <div className="mr-7 flex gap-2.5 rounded-2xl border border-surface-border bg-elevated px-3 py-3">
-                  <Bot
-                    aria-hidden="true"
-                    className="mt-0.5 size-4 shrink-0 text-ai-text"
+              <div
+                aria-live="polite"
+                className="flex flex-col gap-3 pt-5"
+              >
+                {chatMessages.map((message) => (
+                  <ChatMessageBubble
+                    key={message.id}
+                    message={message}
+                    selfId={self?.id}
                   />
-                  <p className="text-xs leading-5 text-copy-muted">
-                    Your prompt is ready. AI generation will connect here in
-                    the next workflow step.
-                  </p>
-                </div>
+                ))}
               </div>
             )}
           </div>
@@ -212,12 +430,19 @@ export function AiWorkspaceSidebar({
             className="shrink-0 border-t border-surface-border p-3"
             onSubmit={handleSubmit}
           >
+            {isDesignRunActive && (
+              <AiStatusStrip
+                message={latestStatusMessage}
+                runStatus={realtimeRun?.status}
+              />
+            )}
             <div className="rounded-2xl border border-surface-border-subtle bg-elevated/70 p-2.5 shadow-inner focus-within:border-ai/50 focus-within:ring-2 focus-within:ring-ai/15">
               <Textarea
                 ref={textareaRef}
-                aria-label="Describe the architecture to Camely AI"
+                aria-label="Send a design prompt"
                 className="max-h-36 min-h-20 resize-none border-0 bg-transparent p-0 text-sm leading-5 text-copy-primary shadow-none placeholder:text-copy-faint focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
-                placeholder="Describe your architecture..."
+                placeholder="Ask Camely AI to change the architecture..."
+                disabled={isComposerDisabled}
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
@@ -229,11 +454,25 @@ export function AiWorkspaceSidebar({
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={!trimmedPrompt}
-                  className="bg-ai text-copy-primary hover:bg-ai/80"
+                  disabled={!trimmedPrompt || isComposerDisabled}
+                  className="text-base hover:opacity-90 disabled:bg-subtle disabled:text-copy-faint disabled:opacity-70"
+                  style={
+                    !trimmedPrompt || isComposerDisabled
+                      ? undefined
+                      : {
+                          backgroundColor: USER_MESSAGE_COLOR.textColor,
+                        }
+                  }
                 >
-                  <Send aria-hidden="true" className="size-3.5" />
-                  Send
+                  {isSubmitting || isDesignRunActive ? (
+                    <LoaderCircle
+                      aria-hidden="true"
+                      className="size-3.5 animate-spin"
+                    />
+                  ) : (
+                    <Send aria-hidden="true" className="size-3.5" />
+                  )}
+                  {isSubmitting || isDesignRunActive ? "Running" : "Send"}
                 </Button>
               </div>
             </div>
@@ -288,4 +527,141 @@ export function AiWorkspaceSidebar({
       )}
     </aside>
   )
+}
+
+function isDesignRunResponse(value: unknown): value is DesignRunResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false
+  }
+
+  const response = value as Record<string, unknown>
+
+  return (
+    typeof response.publicToken === "string" &&
+    response.publicToken.length > 0 &&
+    typeof response.runId === "string" &&
+    response.runId.length > 0
+  )
+}
+
+function readErrorMessage(value: unknown, status: number) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const message = (value as Record<string, unknown>).error
+
+    if (typeof message === "string" && message.trim()) {
+      return message
+    }
+  }
+
+  return `Design generation failed with status ${status}.`
+}
+
+function createChatMessageId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID()
+  }
+
+  return `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function ChatMessageBubble({
+  message,
+  selfId,
+}: {
+  message: AiChatMessage
+  selfId?: string
+}) {
+  const isOwnMessage = message.sender.id === selfId
+  const messageTime = new Date(message.timestamp)
+
+  return (
+    <article
+      className={cn(
+        "max-w-[88%] rounded-2xl border px-3 py-2.5",
+        isOwnMessage
+          ? "ml-auto rounded-br-xl"
+          : message.role === "system"
+            ? "mr-auto rounded-bl-xl border-error/30 bg-error/10"
+            : "mr-auto rounded-bl-xl border-surface-border bg-elevated",
+      )}
+      style={
+        isOwnMessage
+          ? {
+              backgroundColor: USER_MESSAGE_COLOR.textColor,
+              borderColor: USER_MESSAGE_COLOR.textColor,
+              color: "var(--bg-base)",
+            }
+          : undefined
+      }
+    >
+      <div
+        className={cn(
+          "mb-1 flex items-center gap-2 text-[0.625rem]",
+          isOwnMessage ? "opacity-70" : "text-copy-faint",
+        )}
+      >
+        <span
+          className={cn(
+            "truncate font-medium",
+            !isOwnMessage && "text-copy-muted",
+          )}
+        >
+          {isOwnMessage ? "You" : message.sender.name}
+        </span>
+        <span className="capitalize">{message.role}</span>
+        {!Number.isNaN(messageTime.valueOf()) && (
+          <time dateTime={message.timestamp}>
+            {messageTime.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </time>
+        )}
+      </div>
+      <p
+        className={cn(
+          "whitespace-pre-wrap break-words text-sm leading-5",
+          !isOwnMessage && "text-copy-primary",
+        )}
+      >
+        {message.content}
+      </p>
+    </article>
+  )
+}
+
+function AiStatusStrip({
+  message,
+  runStatus,
+}: {
+  message: AiDesignStatusMessage | null
+  runStatus?: string
+}) {
+  return (
+    <div
+      className="mb-2 flex items-center gap-2 rounded-xl border border-success/25 bg-base px-3 py-2 text-xs text-copy-secondary"
+      role="status"
+    >
+      <span
+        aria-hidden="true"
+        className="size-2 shrink-0 animate-pulse rounded-full bg-success shadow-[0_0_10px_var(--state-success)]"
+      />
+      <span className="min-w-0 flex-1 truncate">
+        {message ? getStatusText(message) : "Starting Camely AI..."}
+      </span>
+      {runStatus && (
+        <span className="shrink-0 font-mono text-[0.625rem] text-success">
+          {formatRunStatus(runStatus)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function getStatusText(message: AiDesignStatusMessage) {
+  return message.text?.trim() || "AI status updated."
+}
+
+function formatRunStatus(status: string) {
+  return status.replace(/_/g, " ").toLowerCase()
 }

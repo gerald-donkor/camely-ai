@@ -6,6 +6,7 @@ import {
   useOther,
   useOthersMapped,
 } from "@liveblocks/react/suspense"
+import { LoaderCircle } from "lucide-react"
 
 const MAX_VISIBLE_COLLABORATORS = 5
 
@@ -17,12 +18,14 @@ interface CollaboratorIdentity {
   avatar: string
   id: string
   name: string
+  thinking: boolean
 }
 
 interface CollaboratorCursorIdentity {
   color: string
   id: string
   name: string
+  thinking: boolean
 }
 
 function isSameCollaborator(
@@ -32,7 +35,8 @@ function isSameCollaborator(
   return (
     previous.avatar === current.avatar &&
     previous.id === current.id &&
-    previous.name === current.name
+    previous.name === current.name &&
+    previous.thinking === current.thinking
   )
 }
 
@@ -59,6 +63,7 @@ export function CanvasPresence({
       avatar: other.info.avatar,
       id: other.id,
       name: other.info.name,
+      thinking: other.presence.thinking,
     }),
     isSameCollaborator,
   )
@@ -94,8 +99,14 @@ export function CanvasPresence({
             {visibleCollaborators.map((collaborator, index) => (
               <div
                 key={collaborator.connectionId}
-                aria-label={collaborator.name}
-                className={`relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-elevated text-[0.6875rem] font-semibold text-copy-secondary ring-2 ring-base ${
+                aria-label={`${collaborator.name}${
+                  collaborator.thinking ? " thinking" : ""
+                }`}
+                className={`relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-elevated text-[0.6875rem] font-semibold text-copy-secondary ring-2 ${
+                  collaborator.thinking
+                    ? "ring-ai/80 shadow-lg shadow-ai/25"
+                    : "ring-base"
+                } ${
                   index === 0 ? "" : "-ml-2"
                 }`}
                 role="img"
@@ -111,6 +122,14 @@ export function CanvasPresence({
                 ) : (
                   <span aria-hidden="true">
                     {getInitials(collaborator.name)}
+                  </span>
+                )}
+                {collaborator.thinking && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-0.5 top-0.5 size-2 rounded-full bg-ai-text ring-2 ring-base"
+                  >
+                    <span className="absolute inset-0 animate-ping rounded-full bg-ai-text/70" />
                   </span>
                 )}
               </div>
@@ -151,7 +170,8 @@ function isSameCursorIdentity(
   return (
     previous.color === current.color &&
     previous.id === current.id &&
-    previous.name === current.name
+    previous.name === current.name &&
+    previous.thinking === current.thinking
   )
 }
 
@@ -165,6 +185,7 @@ export function CanvasCursor({
       color: other.info.color,
       id: other.id,
       name: other.info.name.trim() || "Collaborator",
+      thinking: other.presence.thinking,
     }),
     isSameCursorIdentity,
   )
@@ -189,12 +210,20 @@ export function CanvasCursor({
         />
       </svg>
       <span
-        className="absolute left-4 top-4 block max-w-44 truncate whitespace-nowrap rounded-xl border border-base/30 px-2.5 py-1 text-xs font-semibold shadow-lg"
+        className={`absolute left-4 top-4 flex max-w-44 items-center gap-1.5 truncate whitespace-nowrap rounded-xl border border-base/30 px-2.5 py-1 text-xs font-semibold shadow-lg ${
+          collaborator.thinking ? "ring-2 ring-ai/50" : ""
+        }`}
         style={{
           backgroundColor: collaborator.color,
           color: "var(--text-primary)",
         }}
       >
+        {collaborator.thinking && (
+          <LoaderCircle
+            aria-hidden="true"
+            className="size-3 shrink-0 animate-spin text-copy-primary"
+          />
+        )}
         {collaborator.name}
       </span>
     </div>

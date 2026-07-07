@@ -14,11 +14,10 @@ import {
 } from "react"
 import { ClientSideSuspense } from "@liveblocks/react"
 import {
-  LiveblocksProvider,
-  RoomProvider,
   useCanRedo,
   useCanUndo,
   useRedo,
+  useStorage,
   useUndo,
 } from "@liveblocks/react/suspense"
 import {
@@ -67,7 +66,11 @@ import {
   useCanvasAutosave,
 } from "@/hooks/use-canvas-autosave"
 import { isCanvasSnapshot } from "@/lib/canvas-snapshot"
-import { authenticateLiveblocks } from "@/lib/liveblocks-auth-client"
+import {
+  AI_STATUS_FEED_KEY,
+  isAiDesignStatusMessage,
+  type AiDesignStatusMessage,
+} from "@/types/ai-design"
 import {
   DEFAULT_NODE_COLOR,
   DEFAULT_NODE_TEXT_COLOR,
@@ -81,6 +84,7 @@ import {
 
 interface CollaborativeCanvasProps {
   isAiSidebarOpen?: boolean
+  onAiStatusMessagesChange?: (messages: readonly AiDesignStatusMessage[]) => void
   onTemplateImported?: () => void
   onSaveStatusChange?: (status: CanvasSaveStatus) => void
   roomId: string
@@ -194,6 +198,7 @@ function CanvasStatus({ children }: { children: ReactNode }) {
 
 interface LiveCanvasProps {
   isAiSidebarOpen?: boolean
+  onAiStatusMessagesChange?: (messages: readonly AiDesignStatusMessage[]) => void
   onTemplateImported?: () => void
   onSaveStatusChange?: (status: CanvasSaveStatus) => void
   projectId: string
@@ -341,8 +346,28 @@ function CanvasDeleteKeyHandler({
   return null
 }
 
+function AiStatusFeedSync({
+  onChange,
+}: {
+  onChange?: (messages: readonly AiDesignStatusMessage[]) => void
+}) {
+  const latestMessage = useStorage((root) => {
+    const validMessages =
+      (root[AI_STATUS_FEED_KEY] ?? []).filter(isAiDesignStatusMessage)
+
+    return validMessages.at(-1) ?? null
+  })
+
+  useEffect(() => {
+    onChange?.(latestMessage ? [latestMessage] : [])
+  }, [latestMessage, onChange])
+
+  return null
+}
+
 function LiveCanvas({
   isAiSidebarOpen,
+  onAiStatusMessagesChange,
   onTemplateImported,
   onSaveStatusChange,
   projectId,
@@ -781,6 +806,7 @@ function LiveCanvas({
       ref={canvasWrapperRef}
       tabIndex={-1}
     >
+      <AiStatusFeedSync onChange={onAiStatusMessagesChange} />
       <CanvasNodeActionsProvider
         updateColors={updateNodeColors}
         updateLabel={updateNodeLabel}
@@ -853,6 +879,7 @@ function LiveCanvas({
 
 export function CollaborativeCanvas({
   isAiSidebarOpen,
+  onAiStatusMessagesChange,
   onTemplateImported,
   onSaveStatusChange,
   roomId,
@@ -860,29 +887,20 @@ export function CollaborativeCanvas({
   templateToImport,
 }: CollaborativeCanvasProps) {
   return (
-    <LiveblocksProvider
-      authEndpoint={authenticateLiveblocks}
-      preventUnsavedChanges
-    >
-      <RoomProvider
-        id={roomId}
-        initialPresence={{ cursor: null, thinking: false }}
-      >
-        <CanvasErrorBoundary>
-          <ClientSideSuspense
+    <CanvasErrorBoundary>
+      <ClientSideSuspense
             fallback={<CanvasStatus>Loading collaborative canvas…</CanvasStatus>}
-          >
-            <LiveCanvas
-              isAiSidebarOpen={isAiSidebarOpen}
-              onTemplateImported={onTemplateImported}
-              onSaveStatusChange={onSaveStatusChange}
-              projectId={roomId}
-              saveRequest={saveRequest}
-              templateToImport={templateToImport}
-            />
-          </ClientSideSuspense>
-        </CanvasErrorBoundary>
-      </RoomProvider>
-    </LiveblocksProvider>
+      >
+        <LiveCanvas
+          isAiSidebarOpen={isAiSidebarOpen}
+          onAiStatusMessagesChange={onAiStatusMessagesChange}
+          onTemplateImported={onTemplateImported}
+          onSaveStatusChange={onSaveStatusChange}
+          projectId={roomId}
+          saveRequest={saveRequest}
+          templateToImport={templateToImport}
+        />
+      </ClientSideSuspense>
+    </CanvasErrorBoundary>
   )
 }

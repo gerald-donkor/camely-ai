@@ -1,3 +1,7 @@
+import type { LiveList } from "@liveblocks/client"
+
+import type { AiChatMessage, AiStatusFeedMessage } from "./types/tasks"
+
 declare global {
   interface Liveblocks {
     Presence: {
@@ -13,6 +17,13 @@ declare global {
         color: string
       };
     };
+
+    RoomEvent: AiStatusFeedMessage
+
+    Storage: {
+      "ai-chat"?: LiveList<AiChatMessage>
+      "ai-status-feed"?: LiveList<AiStatusFeedMessage>
+    }
 
   }
 }
