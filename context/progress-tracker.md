@@ -8,8 +8,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Starter templates can replace the active collaborative canvas; ready for the
-  next collaborative canvas feature.
+- Canvas state persists to Vercel Blob and restores safely into empty
+  Liveblocks rooms, preparing the workspace for AI generation.
 
 ## Completed
 
@@ -84,7 +84,12 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added a lazily initialized, development-cached Liveblocks server client.
   - Added deterministic cursor color assignment from a fixed canvas-aligned palette.
   - Added a Clerk-authenticated room token route with existing owner-or-collaborator project access enforcement.
-  - Added idempotent private room creation and room-scoped write sessions carrying Clerk user metadata.
+  - Added idempotent private room creation alongside room-scoped write sessions
+    carrying Clerk user metadata.
+  - Reduced each auth request to one Clerk profile lookup and ran room
+    provisioning concurrently with Liveblocks token authorization.
+  - Added an explicit client auth callback plus uncached, structured server
+    failures so Liveblocks always receives a non-empty failure reason.
   - Recorded the Liveblocks client, React, React Flow, and Node packages as reproducible dependencies.
   - Verified with Next.js route type generation, TypeScript, ESLint, and a production build.
 - Base collaborative canvas (`context/feature-specs/11-base-canvas.md`):
@@ -186,6 +191,56 @@ Update this file whenever the current phase, active feature, or implementation s
   - Fit the canvas viewport after the imported graph reaches collaborative
     state without adding server persistence or changing node/edge renderers.
   - Verified with TypeScript, ESLint, and an isolated production build.
+- Presence avatars and cursors
+  (`context/feature-specs/19-presence-avatars-cursor.md`):
+  - Added a room-only participant group at the visible top-right canvas edge
+    without changing the shared editor navbar.
+  - Resolved the current Clerk session user separately through `UserButton` and
+    filtered matching Liveblocks identities from collaborator avatars.
+  - Added profile-photo and initials avatars, a five-person overlapping limit,
+    an overflow count, and a conditional current-user divider.
+  - Broadcast React Flow canvas coordinates through the official Liveblocks
+    cursor integration and clear presence when the pointer leaves the canvas.
+  - Rendered other participants' colored cursor pointers and name badges while
+    excluding every connection belonging to the current Clerk user.
+  - Aligned the shared presence contract with the required nullable `cursor`
+    and boolean `thinking` fields.
+  - Verified with TypeScript, ESLint, and an isolated production build.
+- AI workspace sidebar shell
+  (`context/feature-specs/20-ai-sidebar-shell.md`):
+  - Replaced the placeholder AI panel with a polished room-only workspace
+    header, close action, and animated right-side overlay.
+  - Added local AI Architect and Specs tabs with clear active states and
+    accessible tab semantics.
+  - Added the Ghost AI Architect empty state, prompt suggestions, and a
+    bottom-anchored multiline composer.
+  - Updated the architect hero to `Camely AI Architect` and added a full-width
+    Specs generation action with a locally versioned architecture preview card
+    and disabled pre-persistence Download control.
+  - Added suggestion-to-composer focus, Enter submission, Shift+Enter
+    newlines, empty-submit prevention, and local submitted-prompt rendering.
+  - Kept AI generation, persistence, background work, and canvas mutations out
+    of this shell feature.
+  - Strengthened collaborator cursor labels with guaranteed fallback names,
+    explicit badge positioning, stronger contrast, and higher canvas layering.
+  - Replaced viewport-pixel cursor transport with React Flow canvas-space
+    coordinates that are projected through each viewer's local pan and zoom,
+    keeping both users aligned to the same graph location.
+  - Verified with TypeScript, ESLint, and an isolated production build.
+- Canvas autosave (`context/feature-specs/21-canvas-autosave.md`):
+  - Installed `@vercel/blob` and reused the existing nullable
+    `canvasJsonPath` project metadata field.
+  - Added authenticated owner-or-collaborator canvas GET and PUT routes with
+    validated snapshot boundaries, Vercel Blob JSON storage, and Prisma URL
+    persistence.
+  - Added one-second debounced autosaves with serialized writes, manual save
+    retries, and saving, saved, and error states.
+  - Restored persisted snapshots only after confirming the Liveblocks room is
+    empty, then rechecked before applying the snapshot to avoid overwriting
+    active collaboration.
+  - Added the editor navbar Save control with reactive status treatment and
+    enabled Liveblocks unsaved-change protection.
+  - Verified with TypeScript, ESLint, and an isolated production build.
 
 ## In Progress
 
@@ -193,7 +248,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
-- Define the next collaborative canvas feature.
+- Define the first AI generation workflow on top of persisted canvas state.
 
 ## Open Questions
 
@@ -204,10 +259,19 @@ Update this file whenever the current phase, active feature, or implementation s
 - shadcn/ui uses its generated Base Nova components with Base UI primitives; generated files in `components/ui/` remain unmodified.
 - The application root is permanently dark, and shadcn semantic color variables alias the Camely design tokens.
 - Prisma runtime connections branch by URL protocol: Prisma Postgres/Accelerate URLs use the official Accelerate extension, while direct PostgreSQL URLs use the `pg` driver adapter.
+- Direct PostgreSQL reads use a one-time retry only for closed/reset
+  connection errors so stale pooled sockets do not surface as editor runtime
+  overlays; non-transient errors and non-idempotent writes are not retried.
 - Missing and unauthorized workspace rooms share one access-denied response so project existence is not disclosed.
 - Collaborator access remains keyed by normalized email; Clerk is queried read-only for optional profile enrichment.
 - Liveblocks rooms are private by default; the auth route issues short-lived write access scoped to the authorized project room.
+- Canvas autosave overwrites the stable `canvas/{projectId}.json` blob and
+  cache-busts authenticated server reads with the project's update timestamp;
+  snapshots remain in the configured private Blob store.
 - Cursor colors are deterministically derived from Clerk user IDs so identity color remains stable across sessions.
+- Liveblocks authentication resolves the Clerk profile once, runs room
+  provisioning and token issuance concurrently, never caches token responses,
+  and normalizes infrastructure failures into reason-bearing JSON.
 
 ## Session Notes
 
@@ -298,3 +362,83 @@ Update this file whenever the current phase, active feature, or implementation s
 - Refined the starter template dialog on 2026-07-06 so all template cards stay
   in one horizontal row, with a wider desktop modal and horizontal overflow on
   smaller viewports. `npx tsc --noEmit` and `npm run lint` pass.
+- Presence avatar and cursor implementation completed on 2026-07-06. `npx tsc
+  --noEmit`, `npm run lint`, and an isolated `npm run build` pass; the normal
+  build directory remained locked by the active development environment.
+- AI workspace shell and collaborator cursor-label remediation completed on
+  2026-07-06. `npx tsc --noEmit`, `npm run lint`, and an isolated `npm run
+  build` pass; the normal build directory remained locked by the active
+  development environment.
+- Collaborator cursor presence during React Flow node and selection dragging
+  was remediated on 2026-07-06 so remote names remain visible while shapes
+  move. `npx tsc --noEmit`, `npm run lint`, and an isolated `npm run build`
+  pass; the normal build directory remained locked by the active development
+  environment.
+- Cross-viewport cursor alignment was remediated on 2026-07-06 by adopting the
+  official Liveblocks React Flow cursor integration and storing presence in
+  shared flow coordinates rather than per-window pixels. `npx tsc --noEmit`,
+  `npm run lint`, and an isolated `npm run build` pass.
+- Liveblocks authentication timeout and empty-500 responses were remediated on
+  2026-07-06 by removing the duplicate Clerk lookup, parallelizing Liveblocks
+  room provisioning and token issuance, and adding structured client/server
+  auth errors. `npx tsc --noEmit`, `npm run lint`, and an isolated `npm run
+  build` pass.
+- AI workspace branding and the Specs shell were refined on 2026-07-06 with
+  the `Camely AI Architect` hero, full-width Generate Spec action, locally
+  versioned architecture card, and guarded Download control. `npx tsc
+  --noEmit`, `npm run lint`, and an isolated `npm run build` pass.
+- Canvas autosave and empty-room snapshot restoration completed on 2026-07-06.
+  `npx tsc --noEmit`, `npm run lint`, and an isolated `npm run build` pass; the
+  normal build directory remained locked by the active development
+  environment.
+- Canvas Blob access was corrected on 2026-07-06 to use the configured private
+  store for both authenticated writes and server-side reads after the public
+  access mismatch surfaced as a save-time `502`.
+- Prisma direct PostgreSQL client construction was hardened on 2026-07-06 by
+  scoping the `pg` adapter to the cached Prisma client instance and adding a
+  one-time closed-connection retry around editor/project authorization reads.
+  `npx tsc --noEmit` and `npm run lint` pass.
+- Current issue 1 was remediated on 2026-07-06 by making the workspace Save
+  button default to `Save`, show transient `Saving...`, `Saved`, and `Error`
+  states from the autosave status, and remain hidden from the editor home
+  navbar. The canvas save route already used private Blob access and SDK reads.
+- Manual workspace saves were tightened on 2026-07-06 so the Save button
+  forces the existing autosave persistence path to write the current canvas
+  snapshot even when it matches the last autosaved payload.
+- Current issues 2 through 7 were remediated on 2026-07-06:
+  - Added wrapper-scoped Delete/Backspace removal for selected React Flow nodes
+    and edges using `useNodes()`, `useEdges()`, and the existing
+    Liveblocks-backed change handlers, then hardened it with document-level
+    capture scoped back to the canvas so selection deletion still fires when
+    React Flow holds focus.
+  - Added source and target handles on all four custom node sides so top,
+    right, bottom, and left handles can participate in connections.
+  - Removed React Flow's initial `fitView` behavior from the live canvas so
+    dropping the first node no longer changes the user's viewport.
+  - Kept dropped nodes centered at the cursor position and aligned the drag
+    preview offset with the same center point.
+  - Allowed `img.clerk.com` through Next image `remotePatterns`.
+  - Hid the Clerk `UserButton` in the project workspace navbar while preserving
+    it in the editor home navbar.
+- Issue 2 delete-key remediation was corrected on 2026-07-07 by capturing
+  Delete/Backspace at the document level, scoping the event back to the active
+  canvas wrapper, preserving editable-field guards, and keeping deletion on the
+  existing Liveblocks-backed node and edge change handlers. `npx.cmd tsc
+  --noEmit` and `npm.cmd run lint` pass.
+- Issue 2 deletion was corrected again on 2026-07-07 after confirming
+  `@liveblocks/react-flow` intentionally ignores `remove` changes passed to
+  `onNodesChange` and `onEdgesChange`; the custom Delete/Backspace handler now
+  reads selected nodes and edges from React Flow and calls the Liveblocks
+  `onDelete` mutation helper so removals sync through collaborative storage.
+  `npx.cmd tsc --noEmit` and `npm.cmd run lint` pass.
+- Canvas area selection was added on 2026-07-07 by enabling React Flow's pane
+  drag-selection with partial-overlap selection, keeping selection local through
+  the Liveblocks React Flow adapter, preserving Space+drag and middle/right
+  mouse panning, and disabling double-click zoom so canvas double-click/drag
+  gestures do not unexpectedly zoom the workspace. `npx.cmd tsc --noEmit` and
+  `npm.cmd run lint` pass.
+- Canvas panning after area selection was corrected on 2026-07-07 by restoring
+  normal left-drag panning as the default and making area selection a one-shot
+  mode armed by double-clicking the empty canvas; the mode disarms after the
+  selection completes or after a follow-up pane click. `npx.cmd tsc --noEmit`
+  and `npm.cmd run lint` pass.

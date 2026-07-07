@@ -33,6 +33,8 @@ export const DEFAULT_NODE_TEXT_COLOR = NODE_COLORS[0].textColor
 export const SHAPE_DRAG_MIME_TYPE = "application/x-camely-shape"
 
 export interface ShapeDragPayload {
+  dragOffsetX?: number
+  dragOffsetY?: number
   height: number
   shape: CanvasNodeShape
   width: number
@@ -51,3 +53,8 @@ export interface CanvasEdgeData extends Record<string, unknown> {
 
 export type CanvasNode = Node<CanvasNodeData, "canvasNode">
 export type CanvasEdge = Edge<CanvasEdgeData, "canvasEdge">
+
+export interface CanvasSnapshot {
+  edges: CanvasEdge[]
+  nodes: CanvasNode[]
+}

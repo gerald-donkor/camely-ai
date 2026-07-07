@@ -4,14 +4,16 @@ import {
   PROJECT_SELECT,
   readJsonObject,
 } from "@/lib/project-api"
-import { prisma } from "@/lib/prisma"
+import { prisma, withPrismaConnectionRetry } from "@/lib/prisma"
 
 // Confirm the project exists and the signed-in user is its owner.
 async function authorizeOwner(projectId: string, userId: string) {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { ownerId: true },
-  })
+  const project = await withPrismaConnectionRetry(() =>
+    prisma.project.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true },
+    }),
+  )
 
   if (!project) {
     return errorResponse("Project not found", 404)
