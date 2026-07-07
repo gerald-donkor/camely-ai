@@ -4,7 +4,7 @@ import {
   PROJECT_SELECT,
   readJsonObject,
 } from "@/lib/project-api"
-import { prisma } from "@/lib/prisma"
+import { prisma, withPrismaConnectionRetry } from "@/lib/prisma"
 
 const DEFAULT_PROJECT_NAME = "Untitled Project"
 
@@ -18,11 +18,13 @@ export async function GET() {
   }
 
   // Database query
-  const projects = await prisma.project.findMany({
-    where: { ownerId: userId },
-    orderBy: { updatedAt: "desc" },
-    select: PROJECT_SELECT,
-  })
+  const projects = await withPrismaConnectionRetry(() =>
+    prisma.project.findMany({
+      where: { ownerId: userId },
+      orderBy: { updatedAt: "desc" },
+      select: PROJECT_SELECT,
+    }),
+  )
 
   return Response.json({ projects })
 }

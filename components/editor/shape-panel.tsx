@@ -80,14 +80,22 @@ function handleDragStart(
   height: number,
   dragPreview: HTMLDivElement | null,
 ) {
-  const payload: ShapeDragPayload = { shape, width, height }
+  const dragOffsetX = width / 2
+  const dragOffsetY = height / 2
+  const payload: ShapeDragPayload = {
+    dragOffsetX,
+    dragOffsetY,
+    shape,
+    width,
+    height,
+  }
 
   event.dataTransfer.effectAllowed = "copy"
   event.dataTransfer.setData(SHAPE_DRAG_MIME_TYPE, JSON.stringify(payload))
   event.dataTransfer.setData("text/plain", JSON.stringify(payload))
 
   if (dragPreview) {
-    event.dataTransfer.setDragImage(dragPreview, width / 2, height / 2)
+    event.dataTransfer.setDragImage(dragPreview, dragOffsetX, dragOffsetY)
   }
 }
 

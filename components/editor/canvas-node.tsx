@@ -1,6 +1,7 @@
 import {
   createContext,
   type CSSProperties,
+  Fragment,
   type KeyboardEvent,
   type ReactNode,
   useContext,
@@ -48,6 +49,12 @@ const RESTING_BORDER = "var(--border-subtle)"
 const SELECTED_BORDER = "var(--text-secondary)"
 const MIN_NODE_WIDTH = 80
 const MIN_NODE_HEIGHT = 48
+const CONNECTION_HANDLES = [
+  { id: "top", position: Position.Top },
+  { id: "right", position: Position.Right },
+  { id: "bottom", position: Position.Bottom },
+  { id: "left", position: Position.Left },
+] as const
 const CanvasNodeActionsContext =
   createContext<CanvasNodeActionsContextValue | null>(null)
 
@@ -228,34 +235,24 @@ export function CanvasNodeRenderer({
         selected={selected}
         shape={data.shape}
       />
-      <Handle
-        className={handleClassName}
-        id="top"
-        isConnectable={isConnectable}
-        position={Position.Top}
-        type="source"
-      />
-      <Handle
-        className={handleClassName}
-        id="right"
-        isConnectable={isConnectable}
-        position={Position.Right}
-        type="source"
-      />
-      <Handle
-        className={handleClassName}
-        id="bottom"
-        isConnectable={isConnectable}
-        position={Position.Bottom}
-        type="source"
-      />
-      <Handle
-        className={handleClassName}
-        id="left"
-        isConnectable={isConnectable}
-        position={Position.Left}
-        type="source"
-      />
+      {CONNECTION_HANDLES.map(({ id: handleId, position }) => (
+        <Fragment key={handleId}>
+          <Handle
+            className={handleClassName}
+            id={handleId}
+            isConnectable={isConnectable}
+            position={position}
+            type="source"
+          />
+          <Handle
+            className={handleClassName}
+            id={handleId}
+            isConnectable={isConnectable}
+            position={position}
+            type="target"
+          />
+        </Fragment>
+      ))}
       {isEditing ? (
         <textarea
           aria-label="Node label"

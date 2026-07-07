@@ -4,6 +4,8 @@ import {
   Component,
   type DragEvent,
   type ErrorInfo,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
   type ReactNode,
   useCallback,
   useEffect,
@@ -19,7 +21,10 @@ import {
   useRedo,
   useUndo,
 } from "@liveblocks/react/suspense"
-import { useLiveblocksFlow } from "@liveblocks/react-flow"
+import {
+  Cursors,
+  useLiveblocksFlow,
+} from "@liveblocks/react-flow"
 import {
   Background,
   BackgroundVariant,
@@ -28,13 +33,18 @@ import {
   ConnectionMode,
   MarkerType,
   ReactFlow,
+  SelectionMode,
   type Connection,
   type DefaultEdgeOptions,
   type EdgeChange,
   type NodeChange,
+  type OnDelete,
   type ReactFlowInstance,
+  useEdges,
+  useNodes,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
+import "@liveblocks/react-flow/styles.css"
 
 import {
   CanvasEdgeActionsProvider,
@@ -42,12 +52,22 @@ import {
 } from "@/components/editor/canvas-edge"
 import { CanvasControlBar } from "@/components/editor/canvas-control-bar"
 import {
+  CanvasCursor,
+  CanvasPresence,
+} from "@/components/editor/canvas-presence"
+import {
   CanvasNodeActionsProvider,
   CanvasNodeRenderer,
 } from "@/components/editor/canvas-node"
 import { ShapePanel } from "@/components/editor/shape-panel"
 import type { CanvasTemplate } from "@/components/editor/starter-templates"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
+import {
+  type CanvasSaveStatus,
+  useCanvasAutosave,
+} from "@/hooks/use-canvas-autosave"
+import { isCanvasSnapshot } from "@/lib/canvas-snapshot"
+import { authenticateLiveblocks } from "@/lib/liveblocks-auth-client"
 import {
   DEFAULT_NODE_COLOR,
   DEFAULT_NODE_TEXT_COLOR,
@@ -60,8 +80,11 @@ import {
 } from "@/types/canvas"
 
 interface CollaborativeCanvasProps {
+  isAiSidebarOpen?: boolean
   onTemplateImported?: () => void
+  onSaveStatusChange?: (status: CanvasSaveStatus) => void
   roomId: string
+  saveRequest?: number
   templateToImport?: CanvasTemplate | null
 }
 
@@ -79,6 +102,10 @@ const nodeTypes = {
 
 const edgeTypes = {
   canvasEdge: CanvasEdgeRenderer,
+}
+
+const cursorComponents = {
+  Cursor: CanvasCursor,
 }
 
 const defaultEdgeOptions = {
@@ -166,8 +193,17 @@ function CanvasStatus({ children }: { children: ReactNode }) {
 }
 
 interface LiveCanvasProps {
+  isAiSidebarOpen?: boolean
   onTemplateImported?: () => void
+  onSaveStatusChange?: (status: CanvasSaveStatus) => void
+  projectId: string
+  saveRequest?: number
   templateToImport?: CanvasTemplate | null
+}
+
+interface CanvasDeleteKeyHandlerProps {
+  canvasWrapperRef: RefObject<HTMLDivElement | null>
+  onDelete: OnDelete<CanvasNode, CanvasEdge>
 }
 
 function cloneTemplateNode(node: CanvasNode): CanvasNode {
@@ -191,18 +227,147 @@ function cloneTemplateEdge(edge: CanvasEdge): CanvasEdge {
   }
 }
 
+function isEditableEventTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target.isContentEditable
+  )
+}
+
+function isInsideCanvasWrapper(
+  canvasWrapper: HTMLDivElement,
+  value: EventTarget | Element | null,
+) {
+  const view = canvasWrapper.ownerDocument.defaultView
+
+  return Boolean(view && value instanceof view.Node && canvasWrapper.contains(value))
+}
+
+function isCanvasKeyboardEvent(
+  canvasWrapper: HTMLDivElement,
+  event: globalThis.KeyboardEvent,
+) {
+  const activeElement = canvasWrapper.ownerDocument.activeElement
+
+  return (
+    isInsideCanvasWrapper(canvasWrapper, event.target) ||
+    isInsideCanvasWrapper(canvasWrapper, activeElement) ||
+    activeElement === canvasWrapper.ownerDocument.body ||
+    activeElement === canvasWrapper.ownerDocument.documentElement
+  )
+}
+
+function CanvasDeleteKeyHandler({
+  canvasWrapperRef,
+  onDelete,
+}: CanvasDeleteKeyHandlerProps) {
+  const flowNodes = useNodes<CanvasNode>()
+  const flowEdges = useEdges<CanvasEdge>()
+  const flowNodesRef = useRef(flowNodes)
+  const flowEdgesRef = useRef(flowEdges)
+
+  useEffect(() => {
+    flowNodesRef.current = flowNodes
+    flowEdgesRef.current = flowEdges
+  }, [flowEdges, flowNodes])
+
+  useEffect(() => {
+    const canvasWrapper = canvasWrapperRef.current
+
+    if (!canvasWrapper) {
+      return
+    }
+
+    const activeCanvasWrapper: HTMLDivElement = canvasWrapper
+
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        (event.key !== "Delete" && event.key !== "Backspace") ||
+        isEditableEventTarget(event.target) ||
+        !isCanvasKeyboardEvent(activeCanvasWrapper, event)
+      ) {
+        return
+      }
+
+      const selectedNodes = flowNodesRef.current.filter((node) => node.selected)
+      const selectedEdges = flowEdgesRef.current.filter((edge) => edge.selected)
+      const selectedNodeIds = new Set(selectedNodes.map((node) => node.id))
+
+      if (selectedNodes.length === 0 && selectedEdges.length === 0) {
+        return
+      }
+
+      const edgeIdsToRemove = new Set(selectedEdges.map((edge) => edge.id))
+
+      for (const edge of flowEdgesRef.current) {
+        if (
+          selectedNodeIds.has(edge.source) ||
+          selectedNodeIds.has(edge.target)
+        ) {
+          edgeIdsToRemove.add(edge.id)
+        }
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      onDelete({
+        edges: flowEdgesRef.current.filter((edge) => edgeIdsToRemove.has(edge.id)),
+        nodes: selectedNodes,
+      })
+    }
+
+    activeCanvasWrapper.ownerDocument.addEventListener("keydown", handleKeyDown, {
+      capture: true,
+    })
+    activeCanvasWrapper.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      activeCanvasWrapper.ownerDocument.removeEventListener(
+        "keydown",
+        handleKeyDown,
+        { capture: true },
+      )
+      activeCanvasWrapper.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [canvasWrapperRef, onDelete])
+
+  return null
+}
+
 function LiveCanvas({
+  isAiSidebarOpen,
   onTemplateImported,
+  onSaveStatusChange,
+  projectId,
+  saveRequest = 0,
   templateToImport,
 }: LiveCanvasProps) {
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null)
+  const [isAreaSelectionArmed, setIsAreaSelectionArmed] = useState(false)
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     CanvasNode,
     CanvasEdge
   > | null>(null)
+  const canvasWrapperRef = useRef<HTMLDivElement>(null)
   const nodeCounter = useRef(0)
   const importedTemplateRef = useRef<CanvasTemplate | null>(null)
   const pendingFitNodeIdsRef = useRef<Set<string> | null>(null)
+  const pendingLoadRef = useRef<{
+    edgeIds: Set<string>
+    nodeIds: Set<string>
+  } | null>(null)
+  const lastSaveRequestRef = useRef(saveRequest)
+  const nodesRef = useRef<CanvasNode[]>([])
+  const edgesRef = useRef<CanvasEdge[]>([])
+  const [isCanvasReady, setIsCanvasReady] = useState(false)
+  const [hasLoadError, setHasLoadError] = useState(false)
   const canRedo = useCanRedo()
   const canUndo = useCanUndo()
   const redo = useRedo()
@@ -218,12 +383,134 @@ function LiveCanvas({
     nodes: { initial: [] },
     edges: { initial: [] },
   })
+  const { saveNow, status: autosaveStatus } = useCanvasAutosave({
+    edges,
+    enabled: isCanvasReady && !hasLoadError,
+    nodes,
+    projectId,
+  })
 
   useKeyboardShortcuts({
     reactFlowInstance,
     redo,
     undo,
   })
+
+  useEffect(() => {
+    nodesRef.current = nodes
+    edgesRef.current = edges
+  }, [edges, nodes])
+
+  useEffect(() => {
+    onSaveStatusChange?.(hasLoadError ? "error" : autosaveStatus)
+  }, [autosaveStatus, hasLoadError, onSaveStatusChange])
+
+  useEffect(() => {
+    if (lastSaveRequestRef.current === saveRequest) {
+      return
+    }
+
+    lastSaveRequestRef.current = saveRequest
+    saveNow()
+  }, [saveNow, saveRequest])
+
+  useEffect(() => {
+    if (nodesRef.current.length > 0 || edgesRef.current.length > 0) {
+      setIsCanvasReady(true)
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function loadSavedCanvas() {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/canvas`, {
+          cache: "no-store",
+          signal: controller.signal,
+        })
+
+        if (response.status === 204) {
+          setIsCanvasReady(true)
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error(`Canvas load failed with status ${response.status}`)
+        }
+
+        const snapshot: unknown = await response.json()
+
+        if (!isCanvasSnapshot(snapshot)) {
+          throw new Error("Canvas load returned an invalid snapshot")
+        }
+
+        if (nodesRef.current.length > 0 || edgesRef.current.length > 0) {
+          setIsCanvasReady(true)
+          return
+        }
+
+        if (snapshot.nodes.length === 0 && snapshot.edges.length === 0) {
+          setIsCanvasReady(true)
+          return
+        }
+
+        pendingLoadRef.current = {
+          edgeIds: new Set(snapshot.edges.map(({ id }) => id)),
+          nodeIds: new Set(snapshot.nodes.map(({ id }) => id)),
+        }
+        pendingFitNodeIdsRef.current = new Set(
+          snapshot.nodes.map(({ id }) => id),
+        )
+
+        if (snapshot.nodes.length > 0) {
+          onNodesChange(
+            snapshot.nodes.map((node) => ({
+              item: node,
+              type: "add" as const,
+            })),
+          )
+        }
+        if (snapshot.edges.length > 0) {
+          onEdgesChange(
+            snapshot.edges.map((edge) => ({
+              item: edge,
+              type: "add" as const,
+            })),
+          )
+        }
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return
+        }
+
+        console.error("Saved canvas load failed", error)
+        setHasLoadError(true)
+      }
+    }
+
+    void loadSavedCanvas()
+
+    return () => controller.abort()
+  }, [onEdgesChange, onNodesChange, projectId])
+
+  useEffect(() => {
+    const pendingLoad = pendingLoadRef.current
+
+    if (
+      !pendingLoad ||
+      ![...pendingLoad.nodeIds].every((id) =>
+        nodes.some((node) => node.id === id),
+      ) ||
+      ![...pendingLoad.edgeIds].every((id) =>
+        edges.some((edge) => edge.id === id),
+      )
+    ) {
+      return
+    }
+
+    pendingLoadRef.current = null
+    setIsCanvasReady(true)
+  }, [edges, nodes])
 
   useEffect(() => {
     if (!templateToImport) {
@@ -463,11 +750,36 @@ function LiveCanvas({
     )
   }, [])
 
+  const handlePaneClick = useCallback(
+    (event: ReactMouseEvent) => {
+      if (event.detail >= 2) {
+        setIsAreaSelectionArmed(true)
+        return
+      }
+
+      if (isAreaSelectionArmed) {
+        setIsAreaSelectionArmed(false)
+      }
+    },
+    [isAreaSelectionArmed],
+  )
+
+  const disarmAreaSelection = useCallback(() => {
+    setIsAreaSelectionArmed(false)
+  }, [])
+
   return (
     <div
       className="relative size-full bg-base"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      onPointerDown={(event) => {
+        if (!isEditableEventTarget(event.target)) {
+          event.currentTarget.focus()
+        }
+      }}
+      ref={canvasWrapperRef}
+      tabIndex={-1}
     >
       <CanvasNodeActionsProvider
         updateColors={updateNodeColors}
@@ -486,9 +798,9 @@ function LiveCanvas({
             connectionLineType={ConnectionLineType.SmoothStep}
             connectionMode={ConnectionMode.Loose}
             defaultEdgeOptions={defaultEdgeOptions}
+            deleteKeyCode={null}
             edges={edges}
             edgeTypes={edgeTypes}
-            fitView
             nodes={nodes}
             nodeTypes={nodeTypes}
             className="bg-base"
@@ -501,16 +813,32 @@ function LiveCanvas({
             onEdgesChange={onEdgesChange}
             onInit={setReactFlowInstance}
             onNodesChange={onNodesChange}
+            onPaneClick={handlePaneClick}
+            onSelectionEnd={disarmAreaSelection}
+            panOnDrag={isAreaSelectionArmed ? [1, 2] : true}
+            selectionMode={SelectionMode.Partial}
+            selectionOnDrag={isAreaSelectionArmed}
+            zoomOnDoubleClick={false}
           >
+            <CanvasDeleteKeyHandler
+              canvasWrapperRef={canvasWrapperRef}
+              onDelete={onDelete}
+            />
             <Background
               color="var(--border-subtle)"
               gap={24}
               size={1}
               variant={BackgroundVariant.Dots}
             />
+            <Cursors
+              className="z-30"
+              components={cursorComponents}
+              style={{ zIndex: 30 }}
+            />
           </ReactFlow>
         </CanvasEdgeActionsProvider>
       </CanvasNodeActionsProvider>
+      <CanvasPresence isAiSidebarOpen={isAiSidebarOpen} />
       <CanvasControlBar
         canRedo={canRedo}
         canUndo={canUndo}
@@ -524,22 +852,32 @@ function LiveCanvas({
 }
 
 export function CollaborativeCanvas({
+  isAiSidebarOpen,
   onTemplateImported,
+  onSaveStatusChange,
   roomId,
+  saveRequest,
   templateToImport,
 }: CollaborativeCanvasProps) {
   return (
-    <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
+    <LiveblocksProvider
+      authEndpoint={authenticateLiveblocks}
+      preventUnsavedChanges
+    >
       <RoomProvider
         id={roomId}
-        initialPresence={{ cursor: null, isThinking: false }}
+        initialPresence={{ cursor: null, thinking: false }}
       >
         <CanvasErrorBoundary>
           <ClientSideSuspense
             fallback={<CanvasStatus>Loading collaborative canvas…</CanvasStatus>}
           >
             <LiveCanvas
+              isAiSidebarOpen={isAiSidebarOpen}
               onTemplateImported={onTemplateImported}
+              onSaveStatusChange={onSaveStatusChange}
+              projectId={roomId}
+              saveRequest={saveRequest}
               templateToImport={templateToImport}
             />
           </ClientSideSuspense>

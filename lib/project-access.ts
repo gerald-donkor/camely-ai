@@ -2,10 +2,12 @@ import "server-only"
 
 import { auth, currentUser } from "@clerk/nextjs/server"
 
-import { prisma } from "@/lib/prisma"
+import { prisma, withPrismaConnectionRetry } from "@/lib/prisma"
 import type { Project } from "@/types/project"
 
 export interface ClerkIdentity {
+  avatarUrl: string
+  displayName: string
   userId: string
   primaryEmail: string | null
 }
@@ -18,11 +20,18 @@ export async function getCurrentClerkIdentity(): Promise<ClerkIdentity | null> {
   }
 
   const user = await currentUser()
+  const primaryEmail =
+    user?.primaryEmailAddress?.emailAddress.toLowerCase() ?? null
 
   return {
+    avatarUrl: user?.imageUrl ?? "",
+    displayName:
+      user?.fullName ??
+      user?.username ??
+      primaryEmail ??
+      "Camely collaborator",
     userId,
-    primaryEmail:
-      user?.primaryEmailAddress?.emailAddress.toLowerCase() ?? null,
+    primaryEmail,
   }
 }
 
@@ -30,28 +39,30 @@ export async function getProjectForIdentity(
   roomId: string,
   identity: ClerkIdentity,
 ): Promise<Project | null> {
-  const project = await prisma.project.findFirst({
-    where: {
-      id: roomId,
-      OR: [
-        { ownerId: identity.userId },
-        ...(identity.primaryEmail
-          ? [
-              {
-                collaborators: {
-                  some: { email: identity.primaryEmail },
+  const project = await withPrismaConnectionRetry(() =>
+    prisma.project.findFirst({
+      where: {
+        id: roomId,
+        OR: [
+          { ownerId: identity.userId },
+          ...(identity.primaryEmail
+            ? [
+                {
+                  collaborators: {
+                    some: { email: identity.primaryEmail },
+                  },
                 },
-              },
-            ]
-          : []),
-      ],
-    },
-    select: {
-      id: true,
-      name: true,
-      ownerId: true,
-    },
-  })
+              ]
+            : []),
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        ownerId: true,
+      },
+    }),
+  )
 
   if (!project) {
     return null

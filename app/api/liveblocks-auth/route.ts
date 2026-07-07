@@ -1,5 +1,3 @@
-import { currentUser } from "@clerk/nextjs/server"
-
 import {
   getCursorColor,
   getLiveblocksClient,
@@ -8,7 +6,22 @@ import {
   getCurrentClerkIdentity,
   getProjectForIdentity,
 } from "@/lib/project-access"
-import { errorResponse, readJsonObject } from "@/lib/project-api"
+import { readJsonObject } from "@/lib/project-api"
+
+function authenticationErrorResponse(reason: string, status: number) {
+  return Response.json(
+    {
+      error: "authentication_error",
+      reason,
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+      status,
+    },
+  )
+}
 
 function readRoomId(body: Record<string, unknown>) {
   return typeof body.room === "string" && body.room.trim()
@@ -17,56 +30,85 @@ function readRoomId(body: Record<string, unknown>) {
 }
 
 // POST /api/liveblocks-auth — Authorize a project member for one canvas room.
-export async function POST(request: Request) {
+async function authorizeRoom(request: Request) {
   const identity = await getCurrentClerkIdentity()
 
   if (!identity) {
-    return errorResponse("Unauthorized", 401)
+    return authenticationErrorResponse("Unauthorized", 401)
   }
 
   const body = await readJsonObject(request)
 
   if (!body) {
-    return errorResponse("Request body must be a JSON object", 400)
+    return authenticationErrorResponse(
+      "Request body must be a JSON object",
+      400,
+    )
   }
 
   const roomId = readRoomId(body)
 
   if (!roomId) {
-    return errorResponse("A room ID is required", 400)
+    return authenticationErrorResponse("A room ID is required", 400)
   }
 
   const project = await getProjectForIdentity(roomId, identity)
 
   if (!project) {
-    return errorResponse("Forbidden", 403)
+    return authenticationErrorResponse("Forbidden", 403)
   }
 
-  const user = await currentUser()
-  const name =
-    user?.fullName ??
-    user?.username ??
-    identity.primaryEmail ??
-    "Camely collaborator"
-  const avatar = user?.imageUrl ?? ""
   const color = getCursorColor(identity.userId)
   const liveblocks = getLiveblocksClient()
 
-  await liveblocks.getOrCreateRoom(roomId, {
-    defaultAccesses: [],
-  })
-
   const session = liveblocks.prepareSession(identity.userId, {
     userInfo: {
-      name,
-      avatar,
+      name: identity.displayName,
+      avatar: identity.avatarUrl,
       color,
     },
   })
 
   session.allow(roomId, ["*:write"])
 
-  const { body: token, status } = await session.authorize()
+  const [authorization] = await Promise.all([
+    session.authorize(),
+    liveblocks.getOrCreateRoom(roomId, {
+      defaultAccesses: [],
+    }),
+  ])
+  const { body: token, error, status } = authorization
 
-  return new Response(token, { status })
+  if (error || status < 200 || status >= 300 || !token.trim()) {
+    console.error(
+      "Liveblocks token service rejected authorization",
+      error ?? new Error(`Unexpected status ${status}`),
+    )
+
+    return authenticationErrorResponse(
+      "The collaboration token service is temporarily unavailable",
+      503,
+    )
+  }
+
+  return new Response(token, {
+    headers: {
+      "Cache-Control": "no-store",
+      "Content-Type": "application/json",
+    },
+    status,
+  })
+}
+
+export async function POST(request: Request) {
+  try {
+    return await authorizeRoom(request)
+  } catch (error) {
+    console.error("Liveblocks room authorization failed", error)
+
+    return authenticationErrorResponse(
+      "The collaboration service could not authenticate this request",
+      503,
+    )
+  }
 }

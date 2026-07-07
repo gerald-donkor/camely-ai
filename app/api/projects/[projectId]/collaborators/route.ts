@@ -7,7 +7,7 @@ import {
   readJsonObject,
 } from "@/lib/project-api"
 import { getCurrentClerkIdentity } from "@/lib/project-access"
-import { prisma } from "@/lib/prisma"
+import { prisma, withPrismaConnectionRetry } from "@/lib/prisma"
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -18,16 +18,18 @@ async function getProjectMembership(projectId: string) {
     return { error: errorResponse("Unauthorized", 401) } as const
   }
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: {
-      ownerId: true,
-      collaborators: {
-        orderBy: { createdAt: "asc" },
-        select: { email: true },
+  const project = await withPrismaConnectionRetry(() =>
+    prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        ownerId: true,
+        collaborators: {
+          orderBy: { createdAt: "asc" },
+          select: { email: true },
+        },
       },
-    },
-  })
+    }),
+  )
 
   if (!project) {
     return { error: errorResponse("Project not found", 404) } as const
