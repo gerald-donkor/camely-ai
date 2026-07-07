@@ -4,15 +4,24 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Phase
 
-- Collaborative canvas foundation
+- AI generation backend foundation
 
 ## Current Goal
 
-- Canvas state persists to Vercel Blob and restores safely into empty
-  Liveblocks rooms, preparing the workspace for AI generation.
+- None.
 
 ## Completed
 
+- Trigger.dev foundation:
+  - Added the project-level Trigger.dev config using the supported
+    `@trigger.dev/sdk` root import with tasks discovered from `src/trigger`.
+  - Moved the Trigger.dev project ref into local environment configuration and
+    referenced it from `trigger.config.ts` through `TRIGGER_PROJECT_REF`.
+  - Added a dashboard-testable `trigger-setup-check` task as the first exported
+    task in the configured Trigger.dev directory.
+  - Added pinned Trigger.dev CLI npm scripts for local development and deploys.
+  - Kept `TRIGGER_SECRET_KEY` as a local dashboard-provided secret rather than
+    committing any environment value.
 - Design system foundation (`context/feature-specs/01-design-system.md`):
   - Configured shadcn/ui for Next.js and Tailwind CSS v4.
   - Added Button, Card, Dialog, Input, Tabs, Textarea, and ScrollArea primitives.
@@ -241,14 +250,93 @@ Update this file whenever the current phase, active feature, or implementation s
   - Added the editor navbar Save control with reactive status treatment and
     enabled Liveblocks unsaved-change protection.
   - Verified with TypeScript, ESLint, and an isolated production build.
+- Design agent API (`context/feature-specs/22-design-agent-api.md`):
+  - Added the Prisma TaskRun schema, relation, indexes, and migration for
+    Trigger.dev run ownership tracking.
+  - Applied the TaskRun migration to the configured PostgreSQL database.
+  - Added a minimal `design-agent` Trigger.dev task under the existing
+    configured `src/trigger` directory, accepting `prompt` and `roomId` and
+    echoing/logging the payload without AI or canvas mutations.
+  - Added `POST /api/ai/design` with authenticated JSON validation, project
+    membership enforcement, Trigger.dev task triggering, TaskRun persistence,
+    and `{ runId }` responses.
+  - Added `POST /api/ai/design/token` with authenticated run ownership
+    verification and run-scoped Trigger.dev public token issuance.
+  - Added `.trigger/**` to ESLint's generated-output ignores so Trigger.dev
+    temporary bundles are not linted as source.
+  - Verified with Prisma validation/generation, Next.js route type generation,
+    TypeScript, ESLint, and a production build.
 
 ## In Progress
 
 - None.
 
+## Completed This Phase
+
+- Design agent frontend (`context/feature-specs/26-design-agent-frontend.md`):
+  - Wired the AI sidebar composer to push user prompts into the shared
+    `ai-chat` Liveblocks feed and call `POST /api/ai/design` with
+    `{ prompt, roomId }`.
+  - Updated the design trigger response to return the Trigger.dev
+    run-scoped `publicToken` alongside `runId`.
+  - Subscribed to the active design run with `useRealtimeRun`, skipped heavy
+    payload/output columns, disabled the composer while active, and rendered a
+    compact status strip above the input.
+  - Added collaborative assistant and system messages for completed runs,
+    subscription errors, and trigger failures without manually mutating canvas
+    nodes or edges.
+  - Verified with `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and an elevated
+    `npm.cmd run build`; the normal sandboxed build failed on the existing
+    `.next/trace` `EPERM` lock.
+- Sidebar chat feed (`context/feature-specs/25-sidebar-chat-feed.md`):
+  - Added a room-scoped `ai-chat` Liveblocks storage feed typed separately from
+    `ai-status-feed`.
+  - Added a Zod-backed chat message schema and validation guard in
+    `types/tasks.ts`.
+  - Lifted the Liveblocks room provider to the project workspace so the canvas
+    and AI sidebar share the same room context.
+  - Subscribed the AI sidebar to validated `ai-chat` messages and rendered
+    sender, role, timestamp, and content in feed order.
+  - Rewired the existing sidebar composer to send user chat messages to
+    Liveblocks storage, clear on success, and show a small local error state on
+    failure without triggering backend AI tasks.
+  - Verified with `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and an elevated
+    `npm.cmd run build`; the initial sandboxed build hit the existing
+    `.next/trace-build` `EPERM` lock.
+- AI presence state (`context/feature-specs/24-ai-presence-state.md`):
+  - Added the shared `ai-status-feed` Liveblocks storage feed with a generic
+    task payload schema and validator in `types/tasks.ts`.
+  - Updated design-agent status publishing to emit generic design-source feed
+    messages with optional display text.
+  - Subscribed the sidebar to the latest validated feed message only and used
+    it as the shared AI working state.
+  - Disabled the Architect composer and showed send-button loading while a
+    generation status is active without blocking the rest of the sidebar.
+  - Rendered cursor-badge thinking spinners from Liveblocks presence.
+  - Verified with `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and
+    `npm.cmd run build`; the build required elevated filesystem access after
+    sandboxed `.next/trace` access failed with `EPERM`.
+- Design agent logic (`context/feature-specs/23-design-agent-logic.md`):
+  - Replace the echo Trigger.dev task with OpenRouter-backed structured design
+    planning.
+  - Apply AI actions through Liveblocks storage and room events.
+  - Surface AI status and presence in the collaborative workspace.
+  - Added the shared Liveblocks AI status message contract and updated the
+    feature spec to use `@openrouter/ai-sdk-provider` instead of
+    `@ai-sdk/google`.
+  - Replaced the echo task with an OpenRouter-backed structured planner that
+    mutates the existing Liveblocks React Flow storage, publishes shared
+    statuses, and manages AI presence cleanup.
+  - Wired the collaborative canvas status feed into the AI sidebar, connected
+    the Architect composer to `POST /api/ai/design`, and made AI thinking
+    presence visible in participant avatars and cursor labels.
+  - Verified with `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and a final
+    `npm.cmd run build`; the build required elevated filesystem access for the
+    local `.next/trace-build` file.
+
 ## Next Up
 
-- Define the first AI generation workflow on top of persisted canvas state.
+- None for the AI presence state feature.
 
 ## Open Questions
 
@@ -272,9 +360,50 @@ Update this file whenever the current phase, active feature, or implementation s
 - Liveblocks authentication resolves the Clerk profile once, runs room
   provisioning and token issuance concurrently, never caches token responses,
   and normalizes infrastructure failures into reason-bearing JSON.
+- Design-generation Trigger.dev run subscription tokens are minted only after
+  verifying a persisted TaskRun record belongs to the signed-in Clerk user.
 
 ## Session Notes
 
+- AI-generated node color remediation completed on 2026-07-07 by making the
+  design-agent color sanitizer accept palette names case-insensitively and
+  infer palette colors from generated node labels and shapes when the model
+  omits `colorName`. Future generated architecture diagrams now map APIs and
+  services to Blue, auth to Purple, databases/caches to Teal, queues/events to
+  Orange, and human actors to Pink. `npx.cmd tsc --noEmit`,
+  `npm.cmd run lint`, and an elevated `npm.cmd run build` pass; the normal
+  sandboxed build failed on `.next/trace-build` with `EPERM`.
+- Maximum update depth remediation completed on 2026-07-07 by returning a
+  stable latest AI status message from the Liveblocks storage selector instead
+  of a fresh array, and by making the save-feedback navbar effect depend on
+  save capability rather than the inline `onSave` callback identity.
+  `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and an elevated
+  `npm.cmd run build` pass; the normal sandboxed build failed on `.next/trace`
+  with `EPERM`.
+- Design agent frontend implementation completed on 2026-07-07 with
+  Liveblocks-backed prompt/error/final messages, `useRealtimeRun` status
+  tracking from the returned Trigger.dev public token, active-run composer
+  disabling, and a compact status strip. `npx.cmd tsc --noEmit`,
+  `npm.cmd run lint`, and an elevated `npm.cmd run build` pass; the normal
+  sandboxed build failed on `.next/trace` with `EPERM`.
+- Sidebar chat feed implementation completed on 2026-07-07 with a separate
+  room-scoped `ai-chat` Liveblocks storage list, Zod-validated chat messages,
+  shared workspace-level Liveblocks room context, and sidebar composer sending
+  that does not call backend AI tasks. `npx.cmd tsc --noEmit`,
+  `npm.cmd run lint`, and an elevated `npm.cmd run build` pass; the normal
+  sandboxed build failed on `.next/trace-build` with `EPERM`.
+- AI presence state implementation completed on 2026-07-07 with a generic
+  `ai-status-feed` storage feed, validated `types/tasks.ts` payloads, latest
+  status rendering, shared composer loading state, and cursor-badge thinking
+  spinners. `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and an elevated
+  `npm.cmd run build` pass; the normal sandboxed build failed on `.next/trace`
+  with `EPERM`.
+- Design agent API implementation started on 2026-07-07.
+- Design agent API implementation completed on 2026-07-07. `npx.cmd prisma
+  validate`, `npx.cmd prisma generate`, `npx.cmd next typegen`, `npx.cmd tsc
+  --noEmit`, `npm.cmd run lint`, and `npm.cmd run build` pass; the normal build
+  required elevated filesystem access because the local `.next` trace file was
+  locked under sandboxed permissions.
 - Design system implementation completed on 2026-06-29. `npm run lint` and `npm run build` pass.
 - Editor chrome implementation started on 2026-06-29.
 - Editor chrome implementation completed on 2026-06-29. `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
@@ -442,3 +571,28 @@ Update this file whenever the current phase, active feature, or implementation s
   mode armed by double-clicking the empty canvas; the mode disarms after the
   selection completes or after a follow-up pane click. `npx.cmd tsc --noEmit`
   and `npm.cmd run lint` pass.
+- Trigger.dev foundation was completed on 2026-07-07 with a v4 root SDK config
+  import, an env-backed `TRIGGER_PROJECT_REF`, a first `trigger-setup-check`
+  task, and pinned local CLI scripts. `npx.cmd tsc --noEmit` and `npm.cmd run
+  lint` pass; `npm.cmd run build` was blocked by an existing `.next/trace`
+  `EPERM` permission/lock error.
+- Design agent logic implementation continued on 2026-07-07 with the
+  OpenRouter provider correction applied to the feature spec and shared
+  Liveblocks AI status typing added for task/UI integration.
+- Design agent backend logic was implemented on 2026-07-07 with structured
+  OpenRouter planning, action sanitization, server-side `mutateFlow` updates,
+  room status publication, and AI presence lifecycle handling.
+- Design agent UI wiring was implemented on 2026-07-07 with Liveblocks storage
+  status feed sync, API-backed Architect prompt submission, shared progress
+  rendering, and visible AI thinking presence treatment.
+- Design agent logic verification completed on 2026-07-07. `npx.cmd tsc
+  --noEmit`, `npm.cmd run lint`, and an elevated `npm.cmd run build` pass.
+- Design agent OpenRouter/Gemini schema compatibility was corrected on
+  2026-07-07 by simplifying the structured-output JSON schema and disabling
+  strict provider schema constraints while keeping shape, color, action, and
+  layout enforcement in the task-side sanitizer.
+- Design agent planning was converted on 2026-07-07 from AI SDK
+  `Output.object()` structured output to action-specific AI SDK tool calls
+  (`addNode`, `moveNode`, `resizeNode`, `updateNodeData`, `deleteNode`,
+  `addEdge`, `deleteEdge`) to avoid provider runs with no generated object
+  while preserving the existing Liveblocks mutation sanitizer.

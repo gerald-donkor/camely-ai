@@ -57,9 +57,10 @@ export function EditorNavbar({
   const toggleLabel = isSidebarOpen
     ? "Close project sidebar"
     : "Open project sidebar"
+  const hasSaveAction = Boolean(onSave)
 
   useEffect(() => {
-    if (!onSave) {
+    if (!hasSaveAction) {
       return
     }
 
@@ -98,7 +99,7 @@ export function EditorNavbar({
     }
 
     previousSaveStatusRef.current = saveStatus
-  }, [onSave, saveStatus])
+  }, [hasSaveAction, saveStatus])
 
   useEffect(() => {
     return () => {
