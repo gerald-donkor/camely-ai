@@ -587,7 +587,7 @@ Update this file whenever the current phase, active feature, or implementation s
   rendering, and visible AI thinking presence treatment.
 - Design agent logic verification completed on 2026-07-07. `npx.cmd tsc
   --noEmit`, `npm.cmd run lint`, and an elevated `npm.cmd run build` pass.
-- Design agent OpenRouter/Gemini schema compatibility was corrected on
+- Design agent OpenRouter/Nemotron schema compatibility was corrected on
   2026-07-07 by simplifying the structured-output JSON schema and disabling
   strict provider schema constraints while keeping shape, color, action, and
   layout enforcement in the task-side sanitizer.
@@ -596,3 +596,9 @@ Update this file whenever the current phase, active feature, or implementation s
   (`addNode`, `moveNode`, `resizeNode`, `updateNodeData`, `deleteNode`,
   `addEdge`, `deleteEdge`) to avoid provider runs with no generated object
   while preserving the existing Liveblocks mutation sanitizer.
+- Design agent configuration was updated on 2026-07-12 to target the new NVIDIA:
+  Nemotron 3 Nano Omni (free) model (`nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`).
+  Corrected AI SDK `generateText` parameters by changing the invalid `instructions`
+  to `system`, passing `maxOutputTokens` directly to limit generation cleanly,
+  and disabling `parallelToolCalls` for maximum model compatibility. Both
+  TypeScript and lint checks pass successfully.

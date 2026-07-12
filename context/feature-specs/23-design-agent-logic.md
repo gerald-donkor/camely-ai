@@ -11,7 +11,7 @@ Implement the full AI design agent so a user prompt results in real-time updates
    - reuse existing Liveblocks flow and presence patterns instead of creating new ones
 
    Then implement:
-   - use Gemini through OpenRouter (`@openrouter/ai-sdk-provider`) to interpret the user prompt
+   - use NVIDIA: Nemotron 3 Nano Omni (free) through OpenRouter (`@openrouter/ai-sdk-provider`) to interpret the user prompt
    - update the canvas using the existing collaborative flow utilities
    - support actions like:
      - add node

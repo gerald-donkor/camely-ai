@@ -44,7 +44,7 @@ const MAX_NODE_WIDTH = 360
 const MAX_NODE_HEIGHT = 220
 const MIN_X_SPACING = 180
 const MIN_Y_SPACING = 120
-const DEFAULT_MODEL_ID = "google/gemini-2.5-flash"
+const DEFAULT_MODEL_ID = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
 
 type DesignActionType = (typeof DESIGN_ACTION_TYPES)[number]
 type HandleId = (typeof HANDLE_IDS)[number]
@@ -175,6 +175,7 @@ const designActionTools = {
     description: "Add a directed edge between two nodes.",
     inputSchema: jsonSchema<AddEdgeToolInput>({
       properties: edgeProperties,
+      required: ["source", "target"],
       type: "object",
     }),
   }),
@@ -186,6 +187,7 @@ const designActionTools = {
         ...nodeVisualProperties,
         ...positionProperties,
       },
+      required: ["nodeId", "label"],
       type: "object",
     }),
   }),
@@ -195,6 +197,7 @@ const designActionTools = {
       properties: {
         edgeId: { type: "string" },
       },
+      required: ["edgeId"],
       type: "object",
     }),
   }),
@@ -202,6 +205,7 @@ const designActionTools = {
     description: "Delete an existing node.",
     inputSchema: jsonSchema<DeleteNodeToolInput>({
       properties: nodeIdentityProperty,
+      required: ["nodeId"],
       type: "object",
     }),
   }),
@@ -212,6 +216,7 @@ const designActionTools = {
         ...nodeIdentityProperty,
         ...positionProperties,
       },
+      required: ["nodeId", "x", "y"],
       type: "object",
     }),
   }),
@@ -223,6 +228,7 @@ const designActionTools = {
         height: { type: "number" },
         width: { type: "number" },
       },
+      required: ["nodeId", "width", "height"],
       type: "object",
     }),
   }),
@@ -235,6 +241,7 @@ const designActionTools = {
         label: { type: "string" },
         shape: { type: "string" },
       },
+      required: ["nodeId"],
       type: "object",
     }),
   }),
@@ -296,8 +303,10 @@ function getOpenRouterModel() {
   const modelId = process.env.OPENROUTER_DESIGN_MODEL?.trim() || DEFAULT_MODEL_ID
 
   return openrouter.chat(modelId, {
-    parallelToolCalls: true,
     usage: { include: true },
+    extraBody: {
+      max_tokens: 3000,
+    },
   })
 }
 
@@ -565,6 +574,7 @@ function buildDesignPrompt(payload: DesignAgentPayload, snapshot: CanvasSnapshot
     "Create a practical architecture diagram by calling the available canvas action tools.",
     `Use these action types exactly: ${DESIGN_ACTION_TYPES.join(", ")}.`,
     "Call one tool for each canvas action. Prefer several addNode calls followed by addEdge calls.",
+    "CRITICAL REQUIREMENT: You MUST connect all newly created nodes with appropriate directed edges (`addEdge` tool calls). An architecture diagram with disconnected components is incorrect and useless. Every service, database, API, and client MUST be connected to show the flow of data.",
     "For existing nodes or edges, reference the exact IDs from the current canvas.",
     "For new nodes, nodeId may be a short semantic key. Reuse that same key in addEdge source/target actions.",
     "Prefer left-to-right layouts with at least 180px horizontal spacing and 120px vertical spacing.",
@@ -609,12 +619,12 @@ async function createDesignPlan(
 ) {
   const result = await generateText({
     abortSignal,
-    instructions:
-      "You are Camely AI, a systems architecture design agent. Translate the user's request into canvas action tool calls. Do not invent unsupported shapes, colors, handles, or action names.",
     maxOutputTokens: 3000,
     maxRetries: 1,
     model: getOpenRouterModel(),
     prompt: buildDesignPrompt(payload, snapshot),
+    system:
+      "You are Camely AI, a systems architecture design agent. Translate the user's request into canvas action tool calls. Do not invent unsupported shapes, colors, handles, or action names.",
     temperature: 0.2,
     toolChoice: "required",
     tools: designActionTools,

@@ -85,7 +85,8 @@ function isClosedConnectionError(error: unknown) {
     code === "EPIPE" ||
     message.includes("server has closed the connection") ||
     message.includes("connection terminated unexpectedly") ||
-    message.includes("connection ended unexpectedly")
+    message.includes("connection ended unexpectedly") ||
+    message.includes("failed to connect to upstream database")
   )
 }
 
