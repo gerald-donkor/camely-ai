@@ -273,6 +273,14 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed This Phase
 
+- Spec generation flow (`context/feature-specs/27-spec-generation-flow.md`):
+  - Added authenticated `POST /api/ai/spec` route with project access verification via `getProjectForIdentity`.
+  - Added authenticated `POST /api/ai/spec/token` route to issue a run-scoped 1-hour public Trigger.dev token after validating ownership.
+  - Created Trigger.dev `generateSpec` task in `src/trigger/generate-spec.ts` using the `@openrouter/ai-sdk-provider` and `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` model.
+  - Formatted the collaborative canvas graph (nodes and edges) and chat history transcript into structured text prompts for the reasoning model.
+  - Added Liveblocks presence thinking status updates and published status feed messages with explicit `source: "spec"` and `ai-status` structure for real-time tracking in the editor.
+  - Verified with `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and a clean production `npm.cmd run build` pass.
+
 - Design agent frontend (`context/feature-specs/26-design-agent-frontend.md`):
   - Wired the AI sidebar composer to push user prompts into the shared
     `ai-chat` Liveblocks feed and call `POST /api/ai/design` with
