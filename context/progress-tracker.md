@@ -273,6 +273,14 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed This Phase
 
+- Spec persistence and download (`context/feature-specs/28-spec-persistence-download.md`):
+  - Created and applied a database migration for the new `ProjectSpec` model to track specification file metadata.
+  - Generated and validated the updated Prisma client supporting the new model relationships.
+  - Updated the Trigger.dev `generateSpec` background task (`src/trigger/generate-spec.ts`) to upload generated markdown content to private Vercel Blob storage, save the Postgres `ProjectSpec` record, and link it to the project.
+  - Implemented the authenticated `GET /api/projects/[projectId]/specs/[specId]/download` route, validating user access via project ownership or collaborator membership before fetching the private spec from Vercel Blob.
+  - Configured the download response as a structured markdown file attachment named after the normalized project title.
+  - Verified with `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and a clean production `npm.cmd run build` pass.
+
 - Spec generation flow (`context/feature-specs/27-spec-generation-flow.md`):
   - Added authenticated `POST /api/ai/spec` route with project access verification via `getProjectForIdentity`.
   - Added authenticated `POST /api/ai/spec/token` route to issue a run-scoped 1-hour public Trigger.dev token after validating ownership.

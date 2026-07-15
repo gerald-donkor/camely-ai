@@ -1,9 +1,11 @@
 import { AbortTaskRunError, logger, schemaTask } from "@trigger.dev/sdk"
 import { LiveList, Liveblocks } from "@liveblocks/node"
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
+import { put } from "@vercel/blob"
 import { generateText } from "ai"
 import { z } from "zod"
 
+import { prisma } from "@/lib/prisma"
 import {
   AI_AGENT_COLOR,
   AI_AGENT_NAME,
@@ -293,8 +295,39 @@ Guidelines for the technical spec:
       }
 
       await publishStatus(client, {
+        message: "Persisting the generated technical specification...",
+        phase: "processing",
+        roomId: payload.roomId,
+        runId,
+      })
+
+      // Upload generated markdown spec to Vercel Blob
+      const blob = await put(
+        `specs/${payload.projectId}/${Date.now()}.md`,
+        markdownOutput,
+        {
+          access: "private",
+          addRandomSuffix: true,
+          contentType: "text/markdown",
+        }
+      )
+
+      // Store spec metadata in Postgres
+      const projectSpec = await prisma.projectSpec.create({
+        data: {
+          projectId: payload.projectId,
+          filePath: blob.url,
+        },
+      })
+
+      logger.info("Persisted spec successfully", {
+        specId: projectSpec.id,
+        filePath: projectSpec.filePath,
+      })
+
+      await publishStatus(client, {
         level: "success",
-        message: "Technical specification generated successfully.",
+        message: "Technical specification generated and saved successfully.",
         phase: "complete",
         roomId: payload.roomId,
         runId,

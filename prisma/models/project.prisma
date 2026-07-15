@@ -16,6 +16,7 @@ model Project {
   updatedAt      DateTime              @updatedAt
   collaborators  ProjectCollaborator[]
   taskRuns       TaskRun[]
+  specs          ProjectSpec[]
 
   @@index([ownerId])
   @@index([createdAt])
@@ -45,4 +46,16 @@ model TaskRun {
 
   @@index([runId])
   @@index([userId, projectId])
+}
+
+// Persistent specification files.
+model ProjectSpec {
+  id        String   @id @default(cuid())
+  projectId String
+  filePath  String
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([createdAt])
 }
