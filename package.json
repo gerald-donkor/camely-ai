@@ -6,8 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "trigger:dev": "npx trigger.dev@4.5.1 dev",
-    "trigger:deploy": "npx trigger.dev@4.5.1 deploy",
+    "trigger:dev": "npx --yes trigger.dev@latest dev",
+    "trigger:deploy": "npx --yes trigger.dev@latest deploy",
     "lint": "eslint"
   },
   "dependencies": {
@@ -22,8 +22,8 @@
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "@trigger.dev/react-hooks": "4.5.3",
-    "@trigger.dev/sdk": "4.5.3",
+    "@trigger.dev/react-hooks": "4.5.4",
+    "@trigger.dev/sdk": "4.5.4",
     "@vercel/blob": "^2.5.0",
     "ai": "^7.0.16",
     "class-variance-authority": "^0.7.1",
@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@trigger.dev/build": "4.5.3",
+    "@trigger.dev/build": "4.5.4",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",

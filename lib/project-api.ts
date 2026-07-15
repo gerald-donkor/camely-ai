@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server"
+import { unstable_noStore as noStore } from "next/cache"
 
 // Public project fields returned consistently by every project endpoint.
 export const PROJECT_SELECT = {
@@ -14,6 +15,7 @@ export const PROJECT_SELECT = {
 
 // Resolve the current Clerk user without redirecting API requests.
 export async function getAuthenticatedUserId() {
+  noStore()
   const { isAuthenticated, userId } = await auth()
 
   return isAuthenticated ? userId : null

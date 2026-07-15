@@ -273,6 +273,15 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed This Phase
 
+- Spec UI integration (`context/feature-specs/29-spec-ui-integration.md`):
+  - Added authenticated `GET /api/projects/[projectId]/specs` route with project membership validation to list all generated specifications.
+  - Subscribed `AiWorkspaceSidebar` Specs tab to real-time `generateSpec` runs with Trigger.dev's `useRealtimeRun` and automatic spec list refresh on completion.
+  - Implemented the Specs tab list fetching and rendered a compact, styled, scrollable list of specifications with file details and action controls.
+  - Added an overlay `<Dialog>` preview modal, asynchronously loading specification markdown content from the secure backend download endpoint upon click.
+  - Created a custom, lightweight, type-safe markdown-to-HTML parser (`renderMarkdown`) to render spec preview sections beautifully and natively without third-party dependencies.
+  - Configured Direct-to-Browser download trigger buttons for spec list items and the preview modal using the secure download endpoint.
+  - Resolved all React Hook `setState` side-effect and TypeScript closure constraints, passing `npx tsc --noEmit` and `npm run lint` cleanly.
+
 - Spec persistence and download (`context/feature-specs/28-spec-persistence-download.md`):
   - Created and applied a database migration for the new `ProjectSpec` model to track specification file metadata.
   - Generated and validated the updated Prisma client supporting the new model relationships.
@@ -380,6 +389,21 @@ Update this file whenever the current phase, active feature, or implementation s
   verifying a persisted TaskRun record belongs to the signed-in Clerk user.
 
 ## Session Notes
+
+- Clerk global user session fetch caching leak remediation completed on 2026-07-15.
+  Added Next.js `unstable_noStore()` (aliased as `noStore`) right at the entry points
+  of the `getCurrentClerkIdentity` (`lib/project-access.ts`) and
+  `getAuthenticatedUserId` (`lib/project-api.ts`) authentication helpers. This
+  safely opts every page and API route that processes user authentication out of
+  Next.js's global backend fetch memoization cache, completely preventing user
+  sessions and profile metadata from leaking between distinct user accounts.
+
+- Next.js development hot-reload cached model mismatch remediation completed on
+  2026-07-15. Added an ESM self-healing Proxy around the cached database client
+  (`lib/prisma.ts`) so model accesses (e.g. `prisma.projectSpec`) automatically
+  detect missing metadata (resulting from concurrent schema migrations applied in
+  another shell process) and recreate the cached `PrismaClient` on-demand
+  without requiring a manual development server restart.
 
 - AI-generated node color remediation completed on 2026-07-07 by making the
   design-agent color sanitizer accept palette names case-insensitively and

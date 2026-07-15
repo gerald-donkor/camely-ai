@@ -4,7 +4,7 @@ import { PrismaClient } from "@/app/generated/prisma/client"
 
 // Preserve one Prisma client across Next.js development hot reloads.
 const globalForPrisma = globalThis as unknown as {
-  prisma: ReturnType<typeof createPrismaClient> | undefined
+  prisma: PrismaClient | undefined
 }
 
 function getDatabaseUrl() {
@@ -38,12 +38,42 @@ function createPrismaClient() {
   })
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+const prismaInstance = globalForPrisma.prisma ?? createPrismaClient()
 
 // Production processes create their own client; development reuses this one.
 if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma
+  globalForPrisma.prisma = prismaInstance
 }
+
+// Export a self-healing proxy to handle hot-reloads when models are dynamically added to the schema.
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_, prop) {
+    let current = globalForPrisma.prisma
+
+    if (!current) {
+      current = createPrismaClient()
+      if (process.env.NODE_ENV !== "production") {
+        globalForPrisma.prisma = current
+      }
+    }
+
+    // Self-healing check: if the code accesses "projectSpec" but the cached database client
+    // doesn't have it initialized yet, recreate the Prisma client to reload schemas.
+    if (prop === "projectSpec" && !("projectSpec" in current)) {
+      console.warn(
+        "Recreating cached PrismaClient instance because 'projectSpec' model metadata is missing.",
+      )
+      current = createPrismaClient()
+      globalForPrisma.prisma = current
+    }
+
+    const value = Reflect.get(current, prop)
+    if (typeof value === "function") {
+      return value.bind(current)
+    }
+    return value
+  },
+})
 
 function getErrorDetails(error: unknown) {
   if (!error || typeof error !== "object") {

@@ -1,6 +1,7 @@
 import "server-only"
 
 import { auth, currentUser } from "@clerk/nextjs/server"
+import { unstable_noStore as noStore } from "next/cache"
 
 import { prisma, withPrismaConnectionRetry } from "@/lib/prisma"
 import type { Project } from "@/types/project"
@@ -13,6 +14,7 @@ export interface ClerkIdentity {
 }
 
 export async function getCurrentClerkIdentity(): Promise<ClerkIdentity | null> {
+  noStore()
   const { userId } = await auth()
 
   if (!userId) {

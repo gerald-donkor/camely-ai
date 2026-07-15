@@ -25,6 +25,14 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
@@ -41,6 +49,7 @@ import {
   type AiChatMessage,
 } from "@/types/tasks"
 import type { designAgent } from "@/src/trigger/design-agent"
+import type { generateSpec } from "@/src/trigger/generate-spec"
 
 const ARCHITECT_SUGGESTIONS = [
   "Design an e-commerce backend",
@@ -49,6 +58,13 @@ const ARCHITECT_SUGGESTIONS = [
 ] as const
 
 type AiWorkspaceTab = "architect" | "specs"
+
+interface ProjectSpec {
+  id: string
+  projectId: string
+  filePath: string
+  createdAt: string
+}
 
 interface ActiveDesignRun {
   publicToken: string
@@ -83,7 +99,6 @@ export function AiWorkspaceSidebar({
   const [activeTab, setActiveTab] =
     useState<AiWorkspaceTab>("architect")
   const [prompt, setPrompt] = useState("")
-  const [specVersion, setSpecVersion] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeRun, setActiveRun] = useState<ActiveDesignRun | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -101,6 +116,19 @@ export function AiWorkspaceSidebar({
       (root) =>
         (root[AI_CHAT_FEED_KEY] ?? []).filter(isAiChatMessage),
     ) ?? []
+  const nodes = useStorage((root) => (root as Record<string, unknown>).nodes as unknown[]) || []
+  const edges = useStorage((root) => (root as Record<string, unknown>).edges as unknown[]) || []
+
+  // Spec generation states
+  const [activeSpecRun, setActiveSpecRun] = useState<ActiveDesignRun | null>(null)
+  const [isGeneratingSpec, setIsGeneratingSpec] = useState(false)
+  const [specs, setSpecs] = useState<ProjectSpec[]>([])
+  const [isLoadingSpecs, setIsLoadingSpecs] = useState(false)
+  const [specsError, setSpecsError] = useState<string | null>(null)
+  const [selectedSpec, setSelectedSpec] = useState<ProjectSpec | null>(null)
+  const [specContent, setSpecContent] = useState<string | null>(null)
+  const [isLoadingSpecContent, setIsLoadingSpecContent] = useState(false)
+
   const pushChatMessage = useMutation(
     ({ storage }, message: AiChatMessage) => {
       let feed = storage.get(AI_CHAT_FEED_KEY)
@@ -182,6 +210,187 @@ export function AiWorkspaceSidebar({
     onComplete: handleRunComplete,
     skipColumns: ["payload", "output"],
   })
+
+  // Spec list and load callbacks
+  const fetchSpecs = useCallback(async () => {
+    setIsLoadingSpecs(true)
+    setSpecsError(null)
+    try {
+      const res = await fetch(`/api/projects/${roomId}/specs`)
+      if (!res.ok) {
+        throw new Error("Failed to load project specs")
+      }
+      const data = await res.json()
+      setSpecs(data.specs || [])
+    } catch (err) {
+      console.error(err)
+      setSpecsError("Unable to load project specs.")
+    } finally {
+      setIsLoadingSpecs(false)
+    }
+  }, [roomId])
+
+  useEffect(() => {
+    if (activeTab === "specs") {
+      void Promise.resolve().then(() => fetchSpecs())
+    }
+  }, [activeTab, fetchSpecs])
+
+  const handleSpecRunComplete = useCallback(
+    () => {
+      setActiveSpecRun(null)
+      setIsGeneratingSpec(false)
+      fetchSpecs()
+    },
+    [fetchSpecs],
+  )
+
+  const {
+    error: realtimeSpecError,
+  } = useRealtimeRun<typeof generateSpec>(activeSpecRun?.runId, {
+    accessToken: activeSpecRun?.publicToken,
+    enabled: Boolean(activeSpecRun),
+    onComplete: handleSpecRunComplete,
+    skipColumns: ["payload", "output"],
+  })
+
+  useEffect(() => {
+    if (!activeSpecRun || !realtimeSpecError) {
+      return
+    }
+    console.error("Spec run subscription error", realtimeSpecError)
+    void Promise.resolve().then(() => {
+      setActiveSpecRun(null)
+      setIsGeneratingSpec(false)
+    })
+  }, [activeSpecRun, realtimeSpecError])
+
+  useEffect(() => {
+    const currentSpec = selectedSpec
+    if (!currentSpec) {
+      void Promise.resolve().then(() => setSpecContent(null))
+      return
+    }
+
+    const specId = currentSpec.id
+
+    async function loadSpecContent() {
+      setIsLoadingSpecContent(true)
+      try {
+        const res = await fetch(`/api/projects/${roomId}/specs/${specId}/download`)
+        if (!res.ok) {
+          throw new Error("Failed to load specification file content")
+        }
+        const text = await res.text()
+        setSpecContent(text)
+      } catch (err) {
+        console.error(err)
+        setSpecContent("Error: Unable to load specification content. Please try downloading it directly.")
+      } finally {
+        setIsLoadingSpecContent(false)
+      }
+    }
+
+    loadSpecContent()
+  }, [selectedSpec, roomId])
+
+  async function triggerSpecGeneration() {
+    if (isGeneratingSpec || isAiWorking) {
+      return
+    }
+
+    setIsGeneratingSpec(true)
+
+    try {
+      const response = await fetch("/api/ai/spec", {
+        body: JSON.stringify({
+          roomId,
+          chatHistory: chatMessages,
+          nodes,
+          edges,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      })
+
+      const payload: unknown = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(
+          payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+            ? payload.error
+            : `Spec generation failed with status ${response.status}`
+        )
+      }
+
+      if (isDesignRunResponse(payload)) {
+        setActiveSpecRun({
+          publicToken: payload.publicToken,
+          runId: payload.runId,
+        })
+      } else {
+        throw new Error("Invalid response payload from spec generation trigger")
+      }
+    } catch (err) {
+      console.error("Spec generation failed to trigger", err)
+      setIsGeneratingSpec(false)
+    }
+  }
+
+  function renderMarkdown(text: string) {
+    return text.split("\n").map((line, i) => {
+      const trimmed = line.trim()
+      if (trimmed.startsWith("### ")) {
+        return (
+          <h4 key={i} className="text-sm font-bold text-copy-primary mt-4 mb-2">
+            {trimmed.slice(4)}
+          </h4>
+        )
+      }
+      if (trimmed.startsWith("## ")) {
+        return (
+          <h3 key={i} className="text-base font-bold text-copy-primary mt-6 mb-3 border-b border-surface-border-subtle pb-1">
+            {trimmed.slice(3)}
+          </h3>
+        )
+      }
+      if (trimmed.startsWith("# ")) {
+        return (
+          <h2 key={i} className="text-lg font-bold text-copy-primary mt-8 mb-4">
+            {trimmed.slice(2)}
+          </h2>
+        )
+      }
+      if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        return (
+          <li key={i} className="text-xs text-copy-muted leading-relaxed ml-4 list-disc my-1">
+            {trimmed.slice(2)}
+          </li>
+        )
+      }
+      if (trimmed.match(/^\d+\.\s/)) {
+        const content = trimmed.replace(/^\d+\.\s/, "")
+        return (
+          <li key={i} className="text-xs text-copy-muted leading-relaxed ml-4 list-decimal my-1">
+            {content}
+          </li>
+        )
+      }
+      if (trimmed.startsWith("```")) {
+        return null
+      }
+      if (!trimmed) {
+        return <div key={i} className="h-2" />
+      }
+      return (
+        <p key={i} className="text-xs text-copy-muted leading-relaxed my-2">
+          {trimmed}
+        </p>
+      )
+    })
+  }
 
   useEffect(() => {
     if (!activeRun || !realtimeError) {
@@ -482,47 +691,144 @@ export function AiWorkspaceSidebar({
         <div
           id="ai-specs-panel"
           aria-labelledby="ai-specs-tab"
-          className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+          className="min-h-0 flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4"
           role="tabpanel"
         >
           <Button
             type="button"
-            className="h-9 w-full rounded-xl bg-ai text-copy-primary hover:bg-ai/85"
-            onClick={() => setSpecVersion((version) => version + 1)}
+            className="h-9 w-full rounded-xl bg-ai text-copy-primary hover:bg-ai/85 flex items-center justify-center gap-1.5 shrink-0"
+            disabled={isGeneratingSpec || isAiWorking}
+            onClick={triggerSpecGeneration}
           >
-            Generate Spec
+            {isGeneratingSpec ? (
+              <>
+                <LoaderCircle className="size-4 animate-spin" />
+                Generating Spec...
+              </>
+            ) : (
+              "Generate Spec"
+            )}
           </Button>
 
-          <article className="mt-4 rounded-2xl border border-surface-border-subtle bg-elevated/55 p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-subtle text-copy-muted">
-                <FileText aria-hidden="true" className="size-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-copy-primary">
-                  System Architecture v{specVersion}
-                </h3>
-                <p className="mt-1 text-xs leading-5 text-copy-muted">
-                  Microservices design with API gateway, authentication
-                  service, and event-driven communication between bounded
-                  services.
-                </p>
-              </div>
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="space-y-3">
+              {isLoadingSpecs ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-2 text-copy-muted text-xs">
+                  <LoaderCircle className="size-5 animate-spin text-ai" />
+                  Loading specs...
+                </div>
+              ) : specsError ? (
+                <div className="text-center py-12 text-error text-xs">
+                  {specsError}
+                </div>
+              ) : specs.length === 0 ? (
+                <div className="text-center py-12 text-copy-faint text-xs">
+                  No specifications generated yet.
+                </div>
+              ) : (
+                specs.map((spec) => {
+                  const filename = spec.filePath.split("/").pop() || "specification.md"
+                  return (
+                    <article
+                      key={spec.id}
+                      className="rounded-2xl border border-surface-border-subtle bg-elevated/55 p-4 shadow-sm hover:border-surface-border transition-colors cursor-pointer"
+                      onClick={() => setSelectedSpec(spec)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-subtle text-copy-muted">
+                          <FileText aria-hidden="true" className="size-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-semibold text-copy-primary truncate">
+                            {filename}
+                          </h3>
+                          <time className="mt-1 block text-[0.625rem] leading-none text-copy-faint" dateTime={spec.createdAt}>
+                            {new Date(spec.createdAt).toLocaleString()}
+                          </time>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 rounded-xl px-2.5 text-xs text-copy-muted hover:text-copy-primary"
+                          onClick={() => setSelectedSpec(spec)}
+                        >
+                          Preview
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 rounded-xl px-2.5 text-xs text-copy-muted hover:text-copy-primary"
+                          onClick={() => {
+                            window.open(`/api/projects/${roomId}/specs/${spec.id}/download`, "_blank")
+                          }}
+                        >
+                          <Download aria-hidden="true" className="size-3.5 mr-1" />
+                          Download
+                        </Button>
+                      </div>
+                    </article>
+                  )
+                })
+              )}
             </div>
-            <div className="mt-3 flex justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled
-                aria-label="Download will be available after persisted spec generation is connected"
-                className="text-copy-faint"
-              >
-                <Download aria-hidden="true" className="size-3.5" />
-                Download
-              </Button>
-            </div>
-          </article>
+          </ScrollArea>
+
+          <Dialog open={selectedSpec !== null} onOpenChange={(open) => { if (!open) setSelectedSpec(null); }}>
+            <DialogContent className="max-w-2xl bg-elevated border border-surface-border text-copy-primary rounded-3xl p-6 flex flex-col gap-0 [&_[data-slot=dialog-close]]:right-4 [&_[data-slot=dialog-close]]:top-4 [&_[data-slot=dialog-close]]:rounded-full [&_[data-slot=dialog-close]]:border [&_[data-slot=dialog-close]]:border-surface-border [&_[data-slot=dialog-close]]:text-copy-muted">
+              <DialogHeader className="pb-5">
+                <DialogTitle className="text-lg font-bold">
+                  {selectedSpec ? `Spec Preview - ${new Date(selectedSpec.createdAt).toLocaleString()}` : "Spec Preview"}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-copy-muted mt-1">
+                  Review the generated technical specification for this architecture.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <ScrollArea className="min-h-0 flex-1 max-h-[60vh] border border-surface-border-subtle rounded-2xl bg-base p-4">
+                {isLoadingSpecContent ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-2 text-copy-muted text-xs">
+                    <LoaderCircle className="size-5 animate-spin text-ai" />
+                    Loading specification content...
+                  </div>
+                ) : specContent ? (
+                  <div className="prose prose-invert max-w-none text-copy-primary">
+                    {renderMarkdown(specContent)}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 text-copy-faint text-xs">
+                    No content available.
+                  </div>
+                )}
+              </ScrollArea>
+              
+              <div className="mt-5 flex justify-end gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl h-9"
+                  onClick={() => setSelectedSpec(null)}
+                >
+                  Close
+                </Button>
+                {selectedSpec && (
+                  <Button
+                    size="sm"
+                    className="bg-ai text-copy-primary hover:bg-ai/85 rounded-xl h-9 flex items-center gap-1.5"
+                    onClick={() => {
+                      window.open(`/api/projects/${roomId}/specs/${selectedSpec.id}/download`, "_blank")
+                    }}
+                  >
+                    <Download className="size-4" />
+                    Download File
+                  </Button>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
     </aside>
